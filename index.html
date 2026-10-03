@@ -81,6 +81,20 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
 .prog li::before{content:'';position:absolute;top:0;left:50%;width:12px;height:12px;margin-left:-6px;border-radius:50%;background:var(--line)}
 .prog li.done{color:var(--teal);font-weight:700}
 .prog li.done::before{background:var(--teal)}
+.tk{padding:16px}
+.tkin{width:100%;font:inherit;font-size:22px;border:2px solid var(--line);border-radius:10px;padding:10px;margin:6px 0 12px}
+.pst{border-radius:10px;padding:10px;margin-top:10px;font-weight:600}
+.pst.ok{background:#E7F5EC;color:#14532D;border:1px solid #BFE3CC}
+.pst.wait{background:#FFF3CD;color:#6B4E00;border:1px solid #F0DC9B}
+.prog li small{display:block;font-weight:400;color:var(--mute);font-size:11px}
+.stmsg{font-weight:700;margin:6px 0 2px}.stmsg.cooking{color:#9A6A00}.stmsg.ready{color:var(--green)}.stmsg.served{color:var(--teal)}
+.rcard{background:#fff;border:2px solid var(--green);border-radius:14px;margin:12px;padding:14px}
+.rcard .rh{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.rcard h3{font-size:19px}
+.rcard .rl{display:flex;justify-content:space-between;gap:10px;padding:2px 0}
+.rcard .rt{display:flex;justify-content:space-between;font-size:20px;font-weight:700;border-top:1px dashed var(--line);margin-top:8px;padding-top:8px}
+.rcard .rm{color:var(--mute);font-size:14px;margin:2px 0}
+.rcard .row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
 .pay{background:#fff;border:2px solid var(--teal);border-radius:14px;margin:12px;padding:14px}
 .pay h3{font-size:20px;display:flex;justify-content:space-between;margin-bottom:8px}
 .pay .row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
@@ -278,10 +292,22 @@ const store = {
     const { data, error } = await sb.from('orders').insert(o).select().single();
     if (error) throw error; return data;
   },
+  async findByNum(n) {
+    if (DEMO) return dRead('orders').find(o => o.num === n) || null;
+    const since = new Date(Date.now() - 2 * 864e5).toISOString();
+    const { data, error } = await sb.from('orders').select('*').eq('num', n).gte('created_at', since).order('created_at', { ascending: false }).limit(1);
+    if (error) throw error;
+    return data[0] || null;
+  },
   async patchOrders(ids, patch) {
     if (!ids.length) return;
     if (DEMO) { dWrite('orders', dRead('orders').map(x => ids.includes(x.id) ? { ...x, ...patch } : x)); return; }
-    const { error } = await sb.from('orders').update(patch).in('id', ids);
+    let { error } = await sb.from('orders').update(patch).in('id', ids);
+    if (error) {
+      const slim = { ...patch };
+      ['cooking_at', 'ready_at', 'served_at', 'paid_at'].forEach(k => delete slim[k]);
+      if (Object.keys(slim).length !== Object.keys(patch).length) ({ error } = await sb.from('orders').update(slim).in('id', ids));
+    }
     if (error) throw error;
   },
   async addCall(c) {
@@ -341,6 +367,31 @@ function slipOrder(o) {
   ${o.note ? `<hr><div class="sq">Note: ${esc(o.note)}</div>` : ''}<hr>
   <div class="sc">Serve at Table ${o.table_no}</div></div>`;
 }
+const fdt = iso => new Date(iso).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: 'numeric', minute: '2-digit' });
+function billData(list) {
+  const m = {};
+  list.forEach(o => o.items.forEach(i => { m[i.id] = m[i.id] || { ...i, qty: 0 }; m[i.id].qty += i.qty; }));
+  const lines = Object.values(m);
+  const last = k => list.map(o => o[k]).filter(Boolean).sort().pop();
+  return {
+    lines, total: sum(lines, i => i.price * i.qty),
+    nums: list.map(o => '#' + o.num).join(', '),
+    orderedAt: list.map(o => o.created_at).sort()[0],
+    readyAt: last('ready_at'), paidAt: last('paid_at'),
+    method: list[0].pay_method === 'online' ? 'Online (UPI)' : 'Cash'
+  };
+}
+function slipReceipt(t, list) {
+  const b = billData(list);
+  return `<div class="sl">${CONFIG.LOGO ? `<img class="lg" src="${CONFIG.LOGO}" alt="">` : ''}<div class="sc b">${esc(CONFIG.NAME)}</div><div class="sc b">PAYMENT RECEIPT</div><div class="stn">TABLE ${t}</div>
+  <div class="sc">Orders ${b.nums}</div><hr>
+  <div class="sr"><span>Ordered</span><span>${fdt(b.orderedAt)}</span></div>
+  ${b.readyAt ? `<div class="sr"><span>Food ready</span><span>${fdt(b.readyAt)}</span></div>` : ''}
+  ${b.paidAt ? `<div class="sr"><span>Paid</span><span>${fdt(b.paidAt)}</span></div>` : ''}<hr>
+  ${b.lines.map(i => `<div class="sr"><span>${i.qty} x ${esc(i.name)} @${i.price}</span><span>${i.price * i.qty}</span></div>`).join('')}
+  <hr><div class="sr"><b>TOTAL PAID</b><b>Rs ${b.total}</b></div><div class="sr"><span>Paid by</span><span>${b.method}</span></div><hr>
+  <div class="sc">Thank you! Visit again.</div></div>`;
+}
 function upiQrImg(amt, t) {
   try {
     const h = document.createElement('div');
@@ -366,11 +417,66 @@ function slipBill(t, orders) {
 /* ==========================================================
    CUSTOMER  (?table=5)
    ========================================================== */
+const ST = {
+  keys: ['new', 'cooking', 'ready', 'served'],
+  names: ['Received', 'Preparing', 'Ready to serve', 'Served'],
+  msg: { new: 'Order received. The kitchen will start soon.', cooking: 'Your food is being prepared.', ready: 'Ready! Your food is coming to your table.', served: 'Served. Enjoy your meal!' }
+};
+function payInfo(o) {
+  if (o.pay_status === 'paid') return { cls: 'ok', t: 'Payment received' + (o.pay_method === 'online' ? ' (Online)' : o.pay_method === 'cash' ? ' (Cash)' : '') + (o.paid_at ? ' · ' + fdt(o.paid_at) : '') };
+  if (o.pay_status === 'claimed') return { cls: 'wait', t: 'You have paid online. The counter is confirming it.' };
+  if (o.pay_method === 'cash') return { cls: 'wait', t: 'Payment pending: please pay ' + rupee(o.total) + ' in cash at the counter.' };
+  return { cls: 'wait', t: 'Payment pending: ' + rupee(o.total) + ' is not paid yet.' };
+}
+function makeTracker(root) {
+  const T = { num: null, order: null, msg: '' };
+  root.innerHTML = `<div class="tk"><label class="fl" style="margin-top:0">Enter your order number<input id="tkin" class="tkin" inputmode="numeric" autocomplete="off" placeholder="e.g. 12 or #012"></label><button class="btn gold" data-act="track">Check status</button><div id="tkres"></div></div>`;
+  const input = root.querySelector('#tkin');
+  const parse = v => {
+    const d = String(v).replace(/[०-९]/g, c => '०१२३४५६७८९'.indexOf(c)).replace(/\D/g, '');
+    return d ? parseInt(d, 10) : null;
+  };
+  function show() {
+    const el = root.querySelector('#tkres'), o = T.order;
+    if (!o) { el.innerHTML = T.msg ? `<div class="msg" style="margin:12px 0;background:#FDECEA;border-color:#F5C2BD;color:#8A1C12">${esc(T.msg)}</div>` : ''; return; }
+    const idx = Math.max(0, ST.keys.indexOf(o.status)), at = [o.created_at, o.cooking_at, o.ready_at, o.served_at], pay = payInfo(o);
+    el.innerHTML = `<div class="oc" style="margin:12px 0"><h3><span>Order #${o.num}</span><span class="mute">Table ${o.table_no}</span></h3>
+      <div class="rm mute">${fdt(o.created_at)}</div>
+      <div class="stmsg ${o.status}">${ST.msg[o.status] || ''}</div>
+      <ol class="prog">${ST.names.map((n, i) => `<li class="${i <= idx ? 'done' : ''}">${n}${at[i] ? `<small>${tm(at[i])}</small>` : ''}</li>`).join('')}</ol>
+      ${o.items.map(i => `<div class="li"><span>${i.qty} × ${esc(i.name)}</span><span>${rupee(i.price * i.qty)}</span></div>`).join('')}
+      <div class="li" style="font-weight:700;border-top:1px dashed var(--line);margin-top:6px;padding-top:6px"><span>This order</span><span>${rupee(o.total)}</span></div>
+      <div class="pst ${pay.cls}">${esc(pay.t)}</div></div>`;
+  }
+  async function check() {
+    const n = parse(input.value);
+    if (!n) { T.num = null; T.order = null; T.msg = 'Please type your order number, for example 12.'; show(); return; }
+    T.num = n; T.msg = '';
+    try {
+      T.order = await store.findByNum(n);
+      if (!T.order) T.msg = 'No order found with this number. Please check the number shown on your screen.';
+    } catch (e) { console.error(e); T.order = null; T.msg = 'Could not check right now. Please check your internet and try again.'; }
+    show();
+  }
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') check(); });
+  setInterval(async () => {
+    if (!T.num || !T.order) return;
+    try { const o = await store.findByNum(T.num); if (o) { T.order = o; show(); } } catch (e) {}
+  }, 4000);
+  return { check };
+}
+function trackerView() {
+  document.title = 'Track order · ' + CONFIG.NAME;
+  $('#app').innerHTML = `${demoBar()}<div class="cust"><header class="top"><div style="display:flex;align-items:center">${CONFIG.LOGO ? `<img class="hlogo" src="${CONFIG.LOGO}" alt="">` : ''}<div><div class="brand">${esc(CONFIG.NAME)}</div><div class="sub">Track your order</div></div></div></header><div id="trk"></div></div>`;
+  const tr = makeTracker($('#trk'));
+  H = { track: () => tr.check() };
+}
+
 function customerView(tableNo) {
   document.title = CONFIG.NAME + ' · Table ' + tableNo;
   const items = {};
   CONFIG.MENU.forEach(c => c.items.forEach(i => items[i.id] = i));
-  const S = { cat: CONFIG.MENU[0].cat, tab: 'menu', cart: {}, note: '', sheet: false, sending: false, orders: [], calls: [], sig: '' };
+  const S = { cat: CONFIG.MENU[0].cat, tab: 'menu', cart: {}, note: '', sheet: false, sending: false, orders: [], calls: [], sig: '', prev: {}, hidden: ls.get('vfe_hidden') || [] };
   const cnt = () => sum(Object.values(S.cart), q => q);
   const total = () => sum(Object.entries(S.cart), ([id, q]) => items[id].price * q);
 
@@ -380,10 +486,12 @@ function customerView(tableNo) {
     <div class="bar">
       <button class="tab on" data-act="tab" data-v="menu" id="t-menu">Menu</button>
       <button class="tab" data-act="tab" data-v="orders" id="t-orders">My orders &amp; bill<span id="ob"></span></button>
+      <button class="tab" data-act="tab" data-v="track" id="t-track">Track order</button>
       <button class="callw" data-act="waiter" id="waiter">Call waiter</button>
     </div>
     <section id="v-menu"><div class="chips" id="chips"></div><ul class="menu" id="list"></ul></section>
     <section id="v-orders" hidden></section>
+    <section id="v-track" hidden></section>
     <div id="cartbar"></div><div id="sheet"></div></div>`;
 
   const renderChips = () => $('#chips').innerHTML = CONFIG.MENU.map(c =>
@@ -412,25 +520,43 @@ function customerView(tableNo) {
   const refreshCart = () => { renderList(); renderBar(); renderSheet(); };
   const showTab = () => {
     $('#v-menu').hidden = S.tab !== 'menu'; $('#v-orders').hidden = S.tab !== 'orders';
-    $('#t-menu').classList.toggle('on', S.tab === 'menu'); $('#t-orders').classList.toggle('on', S.tab === 'orders');
+    $('#v-track').hidden = S.tab !== 'track';
+    $('#t-menu').classList.toggle('on', S.tab === 'menu'); $('#t-orders').classList.toggle('on', S.tab === 'orders'); $('#t-track').classList.toggle('on', S.tab === 'track');
     renderBar(); if (S.tab === 'orders') renderOrders(true);
   };
 
+  const tracker = makeTracker($('#v-track'));
   const upiLink = amt => `upi://pay?pa=${encodeURIComponent(CONFIG.UPI_ID)}&pn=${encodeURIComponent(CONFIG.UPI_NAME)}&am=${amt}&cu=INR&tn=${encodeURIComponent('Table ' + tableNo)}`;
-  const stages = ['new', 'cooking', 'ready', 'served'], stageName = ['Received', 'Cooking', 'Ready', 'Served'];
+  const stages = ['new', 'cooking', 'ready', 'served'], stageName = ['Received', 'Preparing', 'Ready to serve', 'Served'];
+  const stageMsg = { new: 'Order received. The kitchen will start soon.', cooking: 'Your food is being prepared.', ready: 'Ready! Your food is coming to your table.', served: 'Served. Enjoy your meal!' };
+  const stageAt = o => [o.created_at, o.cooking_at, o.ready_at, o.served_at];
+  const paidRecent = () => S.orders.filter(o => o.pay_status === 'paid' && !S.hidden.includes(o.id) && Date.now() - new Date(o.paid_at || o.created_at) < (o.paid_at ? 45 : 90) * 6e4).sort(byTime);
+  function receiptCard(list) {
+    const b = billData(list);
+    return `<div class="rcard"><div class="rh">${CONFIG.LOGO ? `<img class="hlogo" src="${CONFIG.LOGO}" alt="">` : ''}<div><h3>Payment receipt</h3><div class="rm">${esc(CONFIG.NAME)} · Table ${tableNo}</div></div></div>
+      <div class="rm">Orders ${b.nums}</div>
+      <div class="rm">Ordered: ${fdt(b.orderedAt)}</div>
+      ${b.readyAt ? `<div class="rm">Food ready: ${fdt(b.readyAt)}</div>` : ''}
+      ${b.paidAt ? `<div class="rm">Paid: ${fdt(b.paidAt)}</div>` : ''}
+      <div style="margin-top:8px">${b.lines.map(i => `<div class="rl"><span>${i.qty} × ${esc(i.name)} <span class="mute">@${rupee(i.price)}</span></span><span>${rupee(i.price * i.qty)}</span></div>`).join('')}</div>
+      <div class="rt"><span>Total paid</span><span>${rupee(b.total)}</span></div>
+      <div class="rm">Paid by: ${b.method}</div>
+      <p style="margin-top:8px;font-weight:600">Thank you! Visit again.</p>
+      <div class="row"><button class="btn teal" data-act="printbill">Save / Print bill</button><button class="btn line" data-act="hidebill">Hide</button></div></div>`;
+  }
 
   function renderOrders(force) {
     const mine = S.orders.filter(o => Date.now() - new Date(o.created_at) < 12 * 36e5).sort(byTime);
     const unpaid = mine.filter(o => o.pay_status !== 'paid');
-    const sig = JSON.stringify(unpaid) + mine.length;
+    const rec = paidRecent();
+    const sig = JSON.stringify([unpaid, rec]) + mine.length;
     $('#ob').textContent = unpaid.length ? ' (' + unpaid.length + ')' : '';
     if (S.tab !== 'orders' || (!force && sig === S.sig)) return;
     S.sig = sig;
     const el = $('#v-orders');
     if (!unpaid.length) {
-      const last = mine[mine.length - 1];
-      el.innerHTML = (last && Date.now() - new Date(last.created_at) < 90 * 6e4)
-        ? `<div class="msg"><b>Payment received. Thank you!</b><br>Order again anytime from the Menu tab.</div>`
+      el.innerHTML = rec.length
+        ? `<div class="msg"><b>Payment received. Thank you!</b><br>Order again anytime from the Menu tab.</div>` + receiptCard(rec)
         : `<div class="empty">No orders yet.<br>Pick something from the menu.<br><button class="btn gold" data-act="tab" data-v="menu">Open menu</button></div>`;
       return;
     }
@@ -450,12 +576,13 @@ function customerView(tableNo) {
       pay = `<div class="pay"><h3><span>Bill so far</span><span>${rupee(amt)}</span></h3><p class="ds">Want something more? Order again from the Menu tab. When you are done, choose how to pay.</p><div class="row"><button class="btn teal" data-act="paycash">Pay cash</button>${onlineOK ? '<button class="btn teal" data-act="payonline">Pay online</button>' : ''}</div></div>`;
     }
     el.innerHTML = unpaid.map(o => {
-      const idx = Math.max(0, stages.indexOf(o.status));
+      const idx = Math.max(0, stages.indexOf(o.status)), at = stageAt(o);
       return `<div class="oc"><h3><span>Order #${o.num}</span><span class="mute">${tm(o.created_at)}</span></h3>
-        <ol class="prog">${stageName.map((n, i) => `<li class="${i <= idx ? 'done' : ''}">${n}</li>`).join('')}</ol>
+        <div class="stmsg ${o.status}">${stageMsg[o.status] || ''}</div>
+        <ol class="prog">${stageName.map((n, i) => `<li class="${i <= idx ? 'done' : ''}">${n}${at[i] ? `<small>${tm(at[i])}</small>` : ''}</li>`).join('')}</ol>
         ${o.items.map(i => `<div class="li"><span>${i.qty} × ${esc(i.name)}</span><span>${rupee(i.price * i.qty)}</span></div>`).join('')}
         ${o.note ? `<div class="ds">Note: ${esc(o.note)}</div>` : ''}</div>`;
-    }).join('') + pay;
+    }).join('') + pay + (rec.length ? receiptCard(rec) : '');
     if (method === 'online' && !claimed && window.QRCode) new QRCode($('#upiqr'), { text: upiLink(amt), width: 190, height: 190 });
   }
 
@@ -463,6 +590,14 @@ function customerView(tableNo) {
   const sync = startSync(async () => {
     const d = await store.load(tableNo);
     S.orders = d.orders; S.calls = d.calls;
+    d.orders.forEach(o => {
+      const p = S.prev[o.id];
+      if (p && p !== o.status) {
+        if (o.status === 'cooking') toast('Kitchen has started preparing your order');
+        else if (o.status === 'ready') { toast('Your food is ready!'); try { navigator.vibrate && navigator.vibrate([200, 100, 200]); } catch (e) {} }
+      }
+      S.prev[o.id] = o.status;
+    });
     const w = S.calls.some(c => c.kind === 'waiter' && !c.done);
     const b = $('#waiter'); b.disabled = w; b.textContent = w ? 'Waiter is coming' : 'Call waiter';
     renderOrders(false);
@@ -480,9 +615,9 @@ function customerView(tableNo) {
       S.sending = true; renderSheet();
       try {
         const lines = Object.entries(S.cart).map(([id, q]) => ({ id, name: items[id].name, price: items[id].price, qty: q }));
-        await store.addOrder({ table_no: tableNo, items: lines, total: total(), note: S.note.trim() || null });
+        const row = await store.addOrder({ table_no: tableNo, items: lines, total: total(), note: S.note.trim() || null });
         S.cart = {}; S.note = ''; S.sheet = false; S.tab = 'orders';
-        toast('Order sent to the kitchen');
+        toast('Order #' + row.num + ' sent to the kitchen');
       } catch (e) { console.error(e); toast('Could not send the order. Check your internet and try again.', true); }
       S.sending = false; refreshCart(); showTab(); await sync();
     },
@@ -500,6 +635,9 @@ function customerView(tableNo) {
       await store.addCall({ table_no: tableNo, kind: 'bill', note: `Says paid ${rupee(amt)} online. Please check and confirm` });
       toast('Thank you!'); await sync(); renderOrders(true);
     },
+    track: () => tracker.check(),
+    printbill: () => { const r = paidRecent(); if (r.length) printHtml(slipReceipt(tableNo, r)); },
+    hidebill: () => { S.hidden = S.hidden.concat(paidRecent().map(o => o.id)); ls.set('vfe_hidden', S.hidden.slice(-60)); renderOrders(true); },
     changepay: async () => { await store.patchOrders(unpaidNow().map(o => o.id), { pay_method: null, pay_status: 'unpaid' }); await sync(); renderOrders(true); }
   };
   document.addEventListener('input', e => { if (e.target.id === 'note') S.note = e.target.value; });
@@ -616,12 +754,12 @@ function counterView() {
     unlock: () => { unlockAudio(); beep(); render(); },
     logout: () => { clearInterval(alarmTimer); alarmTimer = null; ls.set('vfe_auth', ''); counterView(); },
     print: v => printHtml(slipOrder(C.orders.find(o => o.id === v))),
-    next: async v => { const o = C.orders.find(x => x.id === v); await store.patchOrders([v], { status: nextOf[o.status][0] }); await sync(); },
+    next: async v => { const o = C.orders.find(x => x.id === v), to = nextOf[o.status][0]; await store.patchOrders([v], { status: to, [to + '_at']: new Date().toISOString() }); await sync(); },
     calldone: async v => { await store.patchCalls([v], { done: true }); await sync(); },
     bill: v => printHtml(slipBill(v, C.orders.filter(o => o.table_no === +v && o.pay_status !== 'paid'))),
     paid: async v => {
       const t = +v, u = C.orders.filter(o => o.table_no === t && o.pay_status !== 'paid');
-      await store.patchOrders(u.map(o => o.id), { pay_status: 'paid', pay_method: u[0].pay_method || 'cash' });
+      await store.patchOrders(u.map(o => o.id), { pay_status: 'paid', pay_method: u[0].pay_method || 'cash', paid_at: new Date().toISOString() });
       await store.patchCalls(C.calls.filter(c => c.table_no === t && c.kind === 'bill' && !c.done).map(c => c.id), { done: true });
       toast('Table ' + t + ' marked paid'); await sync();
     }
@@ -658,7 +796,7 @@ function homeView(msg) {
   document.title = CONFIG.NAME;
   $('#app').innerHTML = `${demoBar()}<div class="wrap"><h1 class="brand" style="font-size:30px;color:var(--teal)">${esc(CONFIG.NAME)}</h1>
     ${msg ? `<p>${esc(msg)}</p>` : '<p class="mute">Owner page. Customers seedha apne table ka QR scan karte hain.</p>'}
-    <h3 style="margin-top:20px">Staff</h3><p style="margin:8px 0 16px"><a class="btn teal sm" href="?counter">Open counter</a> <a class="btn line sm" href="?qr">Print table QR codes</a></p>
+    <h3 style="margin-top:20px">Staff</h3><p style="margin:8px 0 16px"><a class="btn teal sm" href="?counter">Open counter</a> <a class="btn line sm" href="?qr">Print table QR codes</a> <a class="btn line sm" href="?track">Track an order</a></p>
     <h3>Try the customer screen</h3><div class="hgrid">${Array.from({ length: CONFIG.TABLES }, (_, i) => `<a href="?table=${i + 1}">Table ${i + 1}</a>`).join('')}</div></div>`;
 }
 
@@ -666,6 +804,7 @@ function homeView(msg) {
   const p = new URLSearchParams(location.search), t = parseInt(p.get('table'), 10);
   if (p.has('qr')) qrView();
   else if (p.has('counter')) counterView();
+  else if (p.has('track')) trackerView();
   else if (t >= 1 && t <= CONFIG.TABLES) customerView(t);
   else if (p.has('table')) homeView('This table number is not valid. Please scan the QR code on your table.');
   else homeView();
