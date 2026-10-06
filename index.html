@@ -177,6 +177,27 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
 .hgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:10px 0 20px}
 .hgrid a{background:#fff;border:1.5px solid var(--line);border-radius:10px;text-align:center;padding:10px;text-decoration:none;color:var(--ink);font-weight:700}
 
+[hidden]{display:none!important}
+.home{padding:18px 16px 28px;display:flex;flex-direction:column;gap:14px}
+.bigbtn{display:flex;align-items:center;justify-content:center;gap:12px;background:var(--gold);color:var(--teal2);border-radius:20px;padding:34px 16px;font-family:'Baloo 2',sans-serif;font-weight:800;font-size:27px;line-height:1.1;box-shadow:0 6px 16px rgba(245,179,1,.35)}
+.bigbtn .bi1{font-size:36px}
+.midbtn{background:#fff;border:2px solid var(--teal);color:var(--teal);border-radius:16px;padding:16px;font-weight:700;font-size:18px}
+.hw{background:var(--gold2);border:2px solid var(--gold);color:var(--teal2);border-radius:14px;padding:12px;font-weight:700;font-size:16px}
+.langsel{margin-top:12px;text-align:center}
+.lt2{font-weight:700;color:var(--mute);margin-bottom:8px}
+.seg{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.seg button{padding:8px 16px;border-radius:999px;border:1.5px solid var(--line);background:#fff;font-weight:700}
+.seg button.on{background:var(--teal);color:#fff;border-color:var(--teal)}
+.lnk{color:var(--teal);font-weight:700;font-size:14px;text-decoration:underline}
+.msg.err{background:#FDECEA;border-color:#F5C2BD;color:#8A1C12;margin:10px 0}
+.alert .at{font-size:26px;font-weight:800;display:block;line-height:1.1}
+.alert>div span{display:block;font-size:15px;font-weight:600;margin-top:2px}
+.login .lgi{letter-spacing:0;font-size:18px;text-align:left}
+.stars{display:flex;gap:6px;margin:8px 0}
+.star{font-size:40px;line-height:1;color:#D9E3DE}
+.star.on{color:#F5B301}
+.rtext{width:100%;border:1.5px solid var(--line);border-radius:10px;padding:10px;font:inherit;resize:none;margin-bottom:10px}
+
 /* printing */
 #slip{display:none}
 .sl{width:72mm;font-family:'Courier New',monospace;color:#000;font-size:14px;page-break-after:always}
@@ -206,6 +227,8 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
 /* ==========================================================
    SETTINGS — sirf yahi hissa badalna hai
@@ -640,39 +663,108 @@ const ls = {
    ========================================================== */
 const DEMO = !(CONFIG.SUPABASE_URL && CONFIG.SUPABASE_KEY && window.supabase);
 const sb = DEMO ? null : window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
-const mem = { orders: [], calls: [] };
+const mem = { orders: [], calls: [], ratings: [] };
 const dRead = k => ls.get('vfe_' + k) || mem[k];
 const dWrite = (k, v) => { mem[k] = v; ls.set('vfe_' + k, v); };
 
+const PHONE_RE = /^[6-9]\d{9}$/;
+const maskPhone = p => String(p || '').slice(0, 2) + '••••••' + String(p || '').slice(-2);
+// restaurant ka "din" subah 4 baje (IST) se shuru hota hai
+const dayStartMs = () => {
+  const d = new Date(Date.now() + 5.5 * 36e5 - 4 * 36e5);
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) + 4 * 36e5 - 5.5 * 36e5;
+};
+
 const store = {
-  async load(tableNo) {
+  /* ---------- grahak (sirf chhote, surakshit kaam) ---------- */
+  async placeOrder(o) {
     if (DEMO) {
-      const f = tableNo ? x => x.table_no === tableNo : () => true;
-      return { orders: dRead('orders').filter(f), calls: dRead('calls').filter(f) };
-    }
-    const since = new Date(Date.now() - 2 * 864e5).toISOString();
-    let qo = sb.from('orders').select('*').gte('created_at', since).order('created_at');
-    let qc = sb.from('calls').select('*').gte('created_at', since).order('created_at');
-    if (tableNo) { qo = qo.eq('table_no', tableNo); qc = qc.eq('table_no', tableNo); }
-    const [o, c] = await Promise.all([qo, qc]);
-    if (o.error || c.error) throw (o.error || c.error);
-    return { orders: o.data, calls: c.data };
-  },
-  async addOrder(o) {
-    if (DEMO) {
+      if (!PHONE_RE.test(o.phone)) throw new Error('bad phone');
       const list = dRead('orders').slice();
       const row = { ...o, id: uid(), num: list.reduce((m, x) => Math.max(m, x.num), 0) + 1, status: 'new', pay_status: 'unpaid', pay_method: null, created_at: new Date().toISOString() };
       list.push(row); dWrite('orders', list); return row;
     }
-    const { data, error } = await sb.from('orders').insert(o).select().single();
-    if (error) throw error; return data;
-  },
-  async findByNum(n) {
-    if (DEMO) return dRead('orders').find(o => o.num === n) || null;
-    const since = new Date(Date.now() - 2 * 864e5).toISOString();
-    const { data, error } = await sb.from('orders').select('*').eq('num', n).gte('created_at', since).order('created_at', { ascending: false }).limit(1);
+    const { data, error } = await sb.rpc('place_order', { p_table: o.table_no, p_items: o.items, p_total: o.total, p_note: o.note, p_phone: o.phone });
     if (error) throw error;
-    return data[0] || null;
+    return data;
+  },
+  async myOrders(phone) {
+    if (DEMO) return dRead('orders').filter(o => o.phone === phone && new Date(o.created_at).getTime() >= dayStartMs());
+    const { data, error } = await sb.rpc('my_orders', { p_phone: phone });
+    if (error) throw error;
+    return data || [];
+  },
+  async payAction(phone, action) {
+    if (DEMO) {
+      const ms = dayStartMs();
+      const all = dRead('orders');
+      const mine = all.filter(o => o.phone === phone && new Date(o.created_at).getTime() >= ms && o.pay_status === 'unpaid');
+      const patch = { cash: { pay_method: 'cash' }, online: { pay_method: 'online' }, claimed: { pay_status: 'claimed' }, reset: { pay_method: null } }[action];
+      if (!mine.length || !patch) return;
+      const target = action === 'claimed' ? mine.filter(o => o.pay_method === 'online') : mine;
+      if (!target.length) return;
+      const ids = target.map(o => o.id);
+      dWrite('orders', all.map(o => ids.includes(o.id) ? { ...o, ...patch } : o));
+      const tbl = target[target.length - 1].table_no, amt = sum(target, o => o.total);
+      if (action === 'cash') await store.addCallDemo(tbl, 'bill', 'Wants to pay Rs ' + amt + ' in cash');
+      if (action === 'claimed') await store.addCallDemo(tbl, 'bill', 'Says paid Rs ' + amt + ' online. Please check and confirm');
+      return;
+    }
+    const { error } = await sb.rpc('pay_action', { p_phone: phone, p_action: action });
+    if (error) throw error;
+  },
+  async callWaiter(t) {
+    if (DEMO) { if (!(await store.waiterPending(t))) await store.addCallDemo(t, 'waiter', null); return; }
+    const { error } = await sb.rpc('call_waiter', { p_table: t });
+    if (error) throw error;
+  },
+  async waiterPending(t) {
+    if (DEMO) return dRead('calls').some(c => c.table_no === t && c.kind === 'waiter' && !c.done);
+    const { data, error } = await sb.rpc('waiter_pending', { p_table: t });
+    if (error) throw error;
+    return !!data;
+  },
+  async addCallDemo(t, kind, note) {
+    const list = dRead('calls').slice();
+    list.push({ id: uid(), table_no: t, kind, note, done: false, created_at: new Date().toISOString() });
+    dWrite('calls', list);
+  },
+
+  async submitRating(phone, stars, comment) {
+    if (DEMO) {
+      const ms = dayStartMs(), all = dRead('orders');
+      const mine = all.filter(o => o.phone === phone && new Date(o.created_at).getTime() >= ms && !o.rated);
+      if (!mine.length) throw new Error('nothing to rate');
+      const ids = mine.map(o => o.id);
+      dWrite('orders', all.map(o => ids.includes(o.id) ? { ...o, rated: true } : o));
+      const list = dRead('ratings').slice();
+      list.push({ id: uid(), table_no: mine[mine.length - 1].table_no, stars, comment: (comment || '').trim() || null, created_at: new Date().toISOString() });
+      dWrite('ratings', list);
+      return;
+    }
+    const { error } = await sb.rpc('submit_rating', { p_phone: phone, p_stars: stars, p_comment: comment || '' });
+    if (error) throw error;
+  },
+  async loadRatings() {
+    if (DEMO) return dRead('ratings').slice().sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 100);
+    const { data, error } = await sb.from('ratings').select('*').order('created_at', { ascending: false }).limit(100);
+    if (error) throw error;
+    return data || [];
+  },
+  /* ---------- counter (login ke baad hi chalta hai) ---------- */
+  async load() {
+    const ms = dayStartMs();
+    if (DEMO) {
+      const f = x => new Date(x.created_at).getTime() >= ms;
+      return { orders: dRead('orders').filter(f), calls: dRead('calls').filter(f) };
+    }
+    const since = new Date(ms).toISOString();
+    const [o, c] = await Promise.all([
+      sb.from('orders').select('*').gte('created_at', since).order('created_at'),
+      sb.from('calls').select('*').gte('created_at', since).order('created_at')
+    ]);
+    if (o.error || c.error) throw (o.error || c.error);
+    return { orders: o.data, calls: c.data };
   },
   async patchOrders(ids, patch) {
     if (!ids.length) return;
@@ -685,32 +777,40 @@ const store = {
     }
     if (error) throw error;
   },
-  async addCall(c) {
-    if (DEMO) {
-      const list = dRead('calls').slice();
-      list.push({ ...c, id: uid(), done: false, created_at: new Date().toISOString() });
-      dWrite('calls', list); return;
-    }
-    const { error } = await sb.from('calls').insert(c);
-    if (error) throw error;
-  },
   async patchCalls(ids, patch) {
     if (!ids.length) return;
     if (DEMO) { dWrite('calls', dRead('calls').map(x => ids.includes(x.id) ? { ...x, ...patch } : x)); return; }
     const { error } = await sb.from('calls').update(patch).in('id', ids);
     if (error) throw error;
+  },
+  async cleanup() {
+    const ms = dayStartMs();
+    if (DEMO) { dWrite('orders', dRead('orders').map(o => (o.phone && new Date(o.created_at).getTime() < ms) ? { ...o, phone: null } : o)); return; }
+    const { error } = await sb.rpc('cleanup_old');
+    if (error) throw error;
   }
 };
 
-function startSync(fn) {
-  let busy = false;
+let SYNC = { timer: null, ch: null, demo: null };
+function stopSync() {
+  clearInterval(SYNC.timer);
+  if (SYNC.ch && sb) sb.removeChannel(SYNC.ch);
+  if (SYNC.demo) window.removeEventListener('storage', SYNC.demo);
+  SYNC = { timer: null, ch: null, demo: null };
+}
+function startSync(fn, opt = {}) {
+  stopSync();
+  let busy = false, again = false;
   const run = async () => {
-    if (busy) return; busy = true;
-    try { await fn(); } catch (e) { console.error(e); } finally { busy = false; }
+    if (busy) { again = true; return; }
+    busy = true;
+    try { await fn(); } catch (e) { console.error(e); }
+    busy = false;
+    if (again) { again = false; run(); }
   };
-  if (DEMO) window.addEventListener('storage', run);
-  else sb.channel('vfe-live').on('postgres_changes', { event: '*', schema: 'public' }, run).subscribe();
-  setInterval(run, 4000);   // backup: har 4 second mein bhi check
+  if (DEMO) { window.addEventListener('storage', run); SYNC.demo = run; }
+  else if (opt.realtime) SYNC.ch = sb.channel('vfe-live').on('postgres_changes', { event: '*', schema: 'public' }, run).subscribe();
+  SYNC.timer = setInterval(run, opt.every || 5000);
   return run;
 }
 
@@ -743,29 +843,87 @@ function slipOrder(o) {
   <div class="sc">Serve at Table ${o.table_no}</div></div>`;
 }
 const fdt = iso => new Date(iso).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: 'numeric', minute: '2-digit' });
-function billData(list) {
+function billInfo(list) {
   const m = {};
   list.forEach(o => o.items.forEach(i => { m[i.id] = m[i.id] || { ...i, qty: 0 }; m[i.id].qty += i.qty; }));
   const lines = Object.values(m);
+  const paid = list.filter(o => o.pay_status === 'paid'), claimed = list.filter(o => o.pay_status === 'claimed');
+  const open = list.filter(o => o.pay_status !== 'paid' && o.pay_status !== 'claimed');
   const last = k => list.map(o => o[k]).filter(Boolean).sort().pop();
+  const withM = paid.concat(claimed, open).find(o => o.pay_method);
+  const method = withM ? withM.pay_method : null;
   return {
     lines, total: sum(lines, i => i.price * i.qty),
+    paidAmt: sum(paid, o => o.total),
     nums: list.map(o => '#' + o.num).join(', '),
+    tables: [...new Set(list.map(o => o.table_no))].join(', '),
     orderedAt: list.map(o => o.created_at).sort()[0],
-    readyAt: last('ready_at'), paidAt: last('paid_at'),
-    method: list[0].pay_method === 'online' ? 'Online (UPI)' : 'Cash'
+    readyAt: last('ready_at'), paidAt: paid.length && !open.length && !claimed.length ? last('paid_at') : null,
+    method: method === 'online' ? 'Online (UPI)' : method === 'cash' ? 'Cash' : '',
+    state: open.length ? ((paid.length || claimed.length) ? 'partial' : 'unpaid') : claimed.length ? 'claimed' : 'paid'
   };
 }
-function slipReceipt(t, list) {
-  const b = billData(list);
-  return `<div class="sl">${CONFIG.LOGO ? `<img class="lg" src="${CONFIG.LOGO}" alt="">` : ''}<div class="sc b">${esc(CONFIG.NAME)}</div><div class="sc b">PAYMENT RECEIPT</div><div class="stn">TABLE ${t}</div>
-  <div class="sc">Orders ${b.nums}</div><hr>
-  <div class="sr"><span>Ordered</span><span>${fdt(b.orderedAt)}</span></div>
+function slipReceipt(list, phone) {
+  const b = billInfo(list);
+  const stat = { paid: 'PAID', claimed: 'PAYMENT CHECK PENDING', unpaid: 'PAYMENT PENDING', partial: 'PARTLY PAID' }[b.state];
+  return `<div class="sl">${CONFIG.LOGO ? `<img class="lg" src="${CONFIG.LOGO}" alt="">` : ''}<div class="sc b">${esc(CONFIG.NAME)}</div><div class="sc b">BILL</div>
+  <div class="sc">Table ${esc(b.tables)} · Mobile ${maskPhone(phone)}</div><div class="sc">Orders ${esc(b.nums)}</div><hr>
+  <div class="sr"><span>First order</span><span>${fdt(b.orderedAt)}</span></div>
   ${b.readyAt ? `<div class="sr"><span>Food ready</span><span>${fdt(b.readyAt)}</span></div>` : ''}
   ${b.paidAt ? `<div class="sr"><span>Paid</span><span>${fdt(b.paidAt)}</span></div>` : ''}<hr>
   ${b.lines.map(i => `<div class="sr"><span>${i.qty} x ${esc(i.name)} @${i.price}</span><span>${i.price * i.qty}</span></div>`).join('')}
-  <hr><div class="sr"><b>TOTAL PAID</b><b>Rs ${b.total}</b></div><div class="sr"><span>Paid by</span><span>${b.method}</span></div><hr>
+  <hr><div class="sr"><b>TOTAL</b><b>Rs ${b.total}</b></div><div class="sc b">${stat}</div>
+  ${b.method ? `<div class="sr"><span>Method</span><span>${b.method}</span></div>` : ''}<hr>
   <div class="sc">Thank you! Visit again.</div></div>`;
+}
+// download wali bill: English aur Hindi dono ek saath (hamesha)
+function billDoc(list, phone) {
+  const b = billInfo(list);
+  const stat = {
+    paid: 'PAID ✓ / भुगतान हो गया ✓',
+    claimed: 'Payment check pending / भुगतान की जाँच बाकी है',
+    unpaid: 'Payment pending / भुगतान बाकी है',
+    partial: 'Partly paid / आंशिक भुगतान (' + rupee(b.paidAmt) + ' / ' + rupee(b.total - b.paidAmt) + ')'
+  }[b.state];
+  const row = (a, c) => `<div style="display:flex;justify-content:space-between;gap:10px;margin:3px 0"><span>${a}</span><span>${c}</span></div>`;
+  return `<div style="text-align:center">${CONFIG.LOGO ? `<img src="${CONFIG.LOGO}" style="width:72px;height:72px;object-fit:contain">` : ''}
+    <div style="font-size:20px;font-weight:700">${esc(CONFIG.NAME)}</div><div style="font-size:15px">Bill / बिल</div></div>
+    <div style="border-top:1px dashed #999;margin:10px 0"></div>
+    <div style="font-size:13px;color:#444">
+      ${row('Table / टेबल', esc(b.tables))}${row('Mobile / मोबाइल', maskPhone(phone))}${row('Orders / ऑर्डर', esc(b.nums))}
+      ${row('First order / पहला ऑर्डर', fdt(b.orderedAt))}${b.readyAt ? row('Food ready / खाना तैयार', fdt(b.readyAt)) : ''}${b.paidAt ? row('Paid / भुगतान', fdt(b.paidAt)) : ''}
+    </div>
+    <div style="border-top:1px dashed #999;margin:10px 0"></div>
+    ${b.lines.map(i => `<div style="display:flex;justify-content:space-between;gap:10px;margin:5px 0;font-size:14px"><span>${i.qty} × ${esc(i.name)}${SKU_HI[i.id] ? '<br><span style="color:#555">' + esc(SKU_HI[i.id]) + '</span>' : ''}<br><span style="color:#777;font-size:12px">@${rupee(i.price)}</span></span><b>${rupee(i.price * i.qty)}</b></div>`).join('')}
+    <div style="border-top:2px solid #111;margin:10px 0 6px"></div>
+    <div style="display:flex;justify-content:space-between;font-size:20px;font-weight:700"><span>Total / कुल</span><span>${rupee(b.total)}</span></div>
+    <div style="margin-top:10px;padding:8px;border-radius:8px;background:${b.state === 'paid' ? '#E7F5EC' : '#FFF3CD'};font-weight:700;text-align:center;font-size:14px">${stat}</div>
+    ${b.method ? `<div style="font-size:13px;color:#444;margin-top:6px">Method / तरीका: ${b.method}</div>` : ''}
+    <div style="text-align:center;margin-top:12px;font-size:13px">Thank you! Visit again. / धन्यवाद! फिर पधारें।</div>`;
+}
+async function downloadBill(list, phone) {
+  if (!list.length) return;
+  const host = document.createElement('div');
+  host.style.cssText = 'position:fixed;left:-10000px;top:0;width:380px;background:#fff;color:#111;font-family:Hind,system-ui,sans-serif;padding:18px;line-height:1.35';
+  host.innerHTML = billDoc(list, phone);
+  document.body.appendChild(host);
+  const name = 'Bill-' + new Date().toISOString().slice(0, 10);
+  try {
+    if (!window.html2canvas) throw new Error('no html2canvas');
+    const canvas = await window.html2canvas(host, { scale: 2, backgroundColor: '#ffffff', useCORS: true });
+    if (window.jspdf && window.jspdf.jsPDF) {
+      const w = host.offsetWidth, h = host.offsetHeight;
+      const pdf = new window.jspdf.jsPDF({ unit: 'px', format: [w, h], orientation: h > w ? 'p' : 'l' });
+      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, w, h);
+      pdf.save(name + '.pdf');
+    } else {
+      const a = document.createElement('a');
+      a.href = canvas.toDataURL('image/png'); a.download = name + '.png'; a.click();
+    }
+  } catch (e) {
+    console.error(e);
+    printHtml(slipReceipt(list, phone));
+  } finally { host.remove(); }
 }
 function upiQrImg(amt, t) {
   try {
@@ -792,65 +950,6 @@ function slipBill(t, orders) {
 /* ==========================================================
    CUSTOMER  (?table=5)
    ========================================================== */
-const ST = {
-  keys: ['new', 'cooking', 'ready', 'served'],
-  names: ['Received', 'Preparing', 'Ready to serve', 'Served'],
-  msg: { new: 'Order received. The kitchen will start soon.', cooking: 'Your food is being prepared.', ready: 'Ready! Your food is coming to your table.', served: 'Served. Enjoy your meal!' }
-};
-function payInfo(o) {
-  const at = o.paid_at ? ' · ' + fdt(o.paid_at) : '';
-  if (o.pay_status === 'paid') {
-    const m = o.pay_method === 'online' ? [' (Online)', ' (ऑनलाइन)'] : o.pay_method === 'cash' ? [' (Cash)', ' (नकद)'] : ['', ''];
-    return { cls: 'ok', t: 'Payment received' + m[0] + at, hi: 'पेमेंट मिल गया' + m[1] + at };
-  }
-  if (o.pay_status === 'claimed') return { cls: 'wait', t: 'You have paid online. The counter is confirming it.', hi: 'आपने ऑनलाइन पेमेंट किया है। काउंटर उसे जाँच रहा है।' };
-  if (o.pay_method === 'cash') return { cls: 'wait', t: 'Payment pending: please pay ' + rupee(o.total) + ' in cash at the counter.', hi: 'पेमेंट बाकी है: कृपया काउंटर पर ' + rupee(o.total) + ' नकद दें।' };
-  return { cls: 'wait', t: 'Payment pending: ' + rupee(o.total) + ' is not paid yet.', hi: 'पेमेंट बाकी है: ' + rupee(o.total) + ' अभी नहीं दिया गया।' };
-}
-function makeTracker(root) {
-  const T = { num: null, order: null, msg: '' };
-  root.innerHTML = `<div class="tk"><label class="fl" style="margin-top:0">${L('Enter your order number')}<input id="tkin" class="tkin" inputmode="numeric" autocomplete="off" placeholder="जैसे 12 या #012 / e.g. 12 or #012"></label><button class="btn gold" data-act="track">${L('Check status')}</button><div id="tkres"></div></div>`;
-  const input = root.querySelector('#tkin');
-  const parse = v => {
-    const d = String(v).replace(/[०-९]/g, c => '०१२३४५६७८९'.indexOf(c)).replace(/\D/g, '');
-    return d ? parseInt(d, 10) : null;
-  };
-  function show() {
-    const el = root.querySelector('#tkres'), o = T.order;
-    if (!o) { el.innerHTML = T.msg ? `<div class="msg" style="margin:12px 0;background:#FDECEA;border-color:#F5C2BD;color:#8A1C12">${L(T.msg)}</div>` : ''; return; }
-    const idx = Math.max(0, ST.keys.indexOf(o.status)), at = [o.created_at, o.cooking_at, o.ready_at, o.served_at], pay = payInfo(o);
-    el.innerHTML = `<div class="oc" style="margin:12px 0"><h3><span>${bi('Order #' + o.num, 'ऑर्डर #' + o.num)}</span><span class="mute">${bi('Table ' + o.table_no, 'टेबल ' + o.table_no)}</span></h3>
-      <div class="rm mute">${fdt(o.created_at)}</div>
-      <div class="stmsg ${o.status}">${L(ST.msg[o.status] || '')}</div>
-      <ol class="prog">${ST.names.map((n, i) => `<li class="${i <= idx ? 'done' : ''}">${L(n)}${at[i] ? `<small>${tm(at[i])}</small>` : ''}</li>`).join('')}</ol>
-      ${o.items.map(i => `<div class="li"><span>${i.qty} × ${nm(i)}</span><span>${rupee(i.price * i.qty)}</span></div>`).join('')}
-      <div class="li" style="font-weight:700;border-top:1px dashed var(--line);margin-top:6px;padding-top:6px"><span>${L('This order')}</span><span>${rupee(o.total)}</span></div>
-      <div class="pst ${pay.cls}">${bi(pay.t, pay.hi)}</div></div>`;
-  }
-  async function check() {
-    const n = parse(input.value);
-    if (!n) { T.num = null; T.order = null; T.msg = 'Please type your order number, for example 12.'; show(); return; }
-    T.num = n; T.msg = '';
-    try {
-      T.order = await store.findByNum(n);
-      if (!T.order) T.msg = 'No order found with this number. Please check the number shown on your screen.';
-    } catch (e) { console.error(e); T.order = null; T.msg = 'Could not check right now. Please check your internet and try again.'; }
-    show();
-  }
-  input.addEventListener('keydown', e => { if (e.key === 'Enter') check(); });
-  setInterval(async () => {
-    if (!T.num || !T.order) return;
-    try { const o = await store.findByNum(T.num); if (o) { T.order = o; show(); } } catch (e) {}
-  }, 4000);
-  return { check };
-}
-function trackerView() {
-  document.title = 'Track order · ' + CONFIG.NAME;
-  $('#app').innerHTML = `${demoBar()}<div class="cust"><header class="top"><div style="display:flex;align-items:center">${CONFIG.LOGO ? `<img class="hlogo" src="${CONFIG.LOGO}" alt="">` : ''}<div><div class="brand">${esc(CONFIG.NAME)}</div><div class="sub">${L('Track your order')}</div></div></div></header><div id="trk"></div></div>`;
-  const tr = makeTracker($('#trk'));
-  H = { track: () => tr.check() };
-}
-
 const LANG = { mode: ls.get('vfe_lang') || 'auto', now: 'en' };
 if (LANG.mode === 'hi') LANG.now = 'hi';
 const bi = (en, hi) => hi ? `<span class="bi" data-en="${esc(en)}" data-hi="${esc(hi)}">${esc(LANG.now === 'hi' ? hi : en)}</span>` : esc(en);
@@ -876,7 +975,20 @@ const HI = {
   'Enter your order number': 'अपना ऑर्डर नंबर डालें', 'Check status': 'स्थिति देखें', 'This order': 'यह ऑर्डर', 'Track your order': 'अपना ऑर्डर ट्रैक करें',
   'Please type your order number, for example 12.': 'कृपया अपना ऑर्डर नंबर लिखें, जैसे 12।',
   'No order found with this number. Please check the number shown on your screen.': 'इस नंबर का कोई ऑर्डर नहीं मिला। कृपया स्क्रीन पर दिखा नंबर जाँचें।',
-  'Could not check right now. Please check your internet and try again.': 'अभी जाँच नहीं हो पाई। इंटरनेट जाँचकर फिर कोशिश करें।'
+  'Could not check right now. Please check your internet and try again.': 'अभी जाँच नहीं हो पाई। इंटरनेट जाँचकर फिर कोशिश करें।',
+  'Place a new order': 'नया ऑर्डर करें', 'View past orders / bill': 'पुराने ऑर्डर / बिल देखें',
+  'Mobile number': 'मोबाइल नंबर', '(needed to see your orders and bill)': '(ऑर्डर और बिल देखने के लिए ज़रूरी)',
+  'Enter your mobile number': 'अपना मोबाइल नंबर डालें',
+  'We use your number only to show your orders and bill. It is deleted the next day.': 'आपका नंबर सिर्फ़ आपके ऑर्डर और बिल दिखाने के लिए है। यह अगले दिन मिटा दिया जाएगा।',
+  'Show my orders': 'मेरे ऑर्डर दिखाएँ', 'Enter a valid 10-digit mobile number.': 'कृपया सही 10 अंक का मोबाइल नंबर डालें।',
+  'No orders found for this number today.': 'आज इस नंबर से कोई ऑर्डर नहीं मिला।',
+  'Could not load your orders. Please check your internet.': 'आपके ऑर्डर नहीं खुल पाए। कृपया इंटरनेट जाँचें।',
+  'Change number': 'नंबर बदलें', "Today's bill": 'आज का बिल', 'Download bill': 'बिल डाउनलोड करें', 'Print': 'प्रिंट करें',
+  'Payment verification pending': 'भुगतान की जाँच बाकी है', 'Payment pending': 'भुगतान बाकी है',
+  'I have paid online': 'मैंने ऑनलाइन भुगतान कर दिया है', 'After paying, tap the button below.': 'पैसे देने के बाद नीचे का बटन दबाएँ।',
+  'The counter will check your payment. Your bill is ready below.': 'काउंटर आपका भुगतान जाँचेगा। आपका बिल नीचे तैयार है।',
+  'Loading…': 'खुल रहा है…',
+  'Rate your experience': 'अपना अनुभव बताएँ', 'Submit rating': 'रेटिंग भेजें', 'Thank you for your feedback!': 'आपकी राय के लिए धन्यवाद!'
 };
 const L = en => bi(en, HI[en]);
 const tt = (en, hi) => LANG.now === 'hi' ? hi : en;
@@ -896,7 +1008,8 @@ setInterval(() => {
 }, 3000);
 
 function customerView(tableNo) {
-  document.title = CONFIG.NAME + ' · Table ' + tableNo;
+  const only = !tableNo;   // ?orders wala alag page (bina table ke)
+  document.title = CONFIG.NAME + (only ? '' : ' · Table ' + tableNo);
   const items = {}, base = {};
   CONFIG.MENU.forEach(c => c.items.forEach(i => {
     base[i.id] = i;
@@ -910,25 +1023,43 @@ function customerView(tableNo) {
       ? `<img class="${cls}" src="${img}" alt="${esc(it.name)}" loading="lazy"${cls === 'pic' ? ` data-act="zoom" data-v="${it.base || it.id}"` : ''}>`
       : `<div class="${cls} ph">${esc(String(it.name).trim().charAt(0).toUpperCase())}</div>`;
   };
-  const S = { cat: CONFIG.MENU[0].cat, tab: 'menu', cart: {}, note: '', sheet: false, sending: false, orders: [], calls: [], sig: '', prev: {}, hidden: ls.get('vfe_hidden') || [] };
+  const S = {
+    screen: only ? 'orders' : 'home', cat: CONFIG.MENU[0].cat, cart: {}, note: '',
+    phone: ls.get('vfe_phone') || '', draft: ls.get('vfe_phone') || '',
+    sheet: false, sending: false, orders: [], loaded: false, fail: false, sig: '', prev: {}, waiting: false, err: '', qr: null, rate: { stars: 0, comment: '' }
+  };
   const cnt = () => sum(Object.values(S.cart), q => q);
   const total = () => sum(Object.entries(S.cart), ([id, q]) => items[id].price * q);
+  const stages = ['new', 'cooking', 'ready', 'served'], stageName = ['Received', 'Preparing', 'Ready to serve', 'Served'];
+  const stageMsg = { new: 'Order received. The kitchen will start soon.', cooking: 'Your food is being prepared.', ready: 'Ready! Your food is coming to your table.', served: 'Served. Enjoy your meal!' };
+  const stageAt = o => [o.created_at, o.cooking_at, o.ready_at, o.served_at];
+  const upiLink = (amt, t) => `upi://pay?pa=${encodeURIComponent(CONFIG.UPI_ID)}&pn=${encodeURIComponent(CONFIG.UPI_NAME)}&am=${amt}&cu=INR&tn=${encodeURIComponent('Table ' + (t || ''))}`;
+
+  const homeHtml = () => `<div class="home">
+    <button class="bigbtn" data-act="go" data-v="menu"><span class="bi1">🛒</span><span>${L('Place a new order')}</span></button>
+    <button class="midbtn" data-act="go" data-v="orders">📋 ${L('View past orders / bill')}</button>
+    <button class="hw wbtn" data-act="waiter" data-i="🔔">🔔 ${L('Call waiter')}</button>
+    <div class="langsel"><div class="lt2">🌐 भाषा / Language</div><div class="seg">
+      <button data-act="setlang" data-v="hi" id="sg-hi">हिंदी</button>
+      <button data-act="setlang" data-v="en" id="sg-en">English</button>
+      <button data-act="setlang" data-v="auto" id="sg-auto">हिंदी ⇄ English</button></div></div></div>`;
 
   $('#app').innerHTML = `<div class="cust">${demoBar()}
     <header class="top"><div style="display:flex;align-items:center">${CONFIG.LOGO ? `<img class="hlogo" src="${CONFIG.LOGO}" alt="">` : ''}<div><div class="brand">${esc(CONFIG.NAME)}</div><div class="sub">आपका स्वागत है</div></div></div>
-      <div class="tbadge"><small>${L('Table')}</small><b>${tableNo}</b></div></header>
-    <div class="bar">
-      <button class="tab on" data-act="tab" data-v="menu" id="t-menu">${L('Menu')}</button>
-      <button class="tab" data-act="tab" data-v="orders" id="t-orders">${L('My orders & bill')}<span id="ob"></span></button>
-      <button class="tab" data-act="tab" data-v="track" id="t-track">${L('Track order')}</button>
+      ${only ? '' : `<div class="tbadge"><small>${L('Table')}</small><b>${tableNo}</b></div>`}</header>
+    <section id="v-home" hidden>${homeHtml()}</section>
+    <div class="bar" id="bar" hidden>
+      ${only ? '' : `<button class="tab" data-act="go" data-v="home" aria-label="Home">🏠</button>
+      <button class="tab" data-act="go" data-v="menu" id="t-menu">${L('Menu')}</button>
+      <button class="tab" data-act="go" data-v="orders" id="t-orders">${L('My orders & bill')}</button>`}
       <button class="lang" data-act="lang" id="langbtn"></button>
-      <button class="callw" data-act="waiter" id="waiter">${L('Call waiter')}</button>
+      ${only ? '' : `<button class="callw wbtn" data-act="waiter">${L('Call waiter')}</button>`}
     </div>
-    <section id="v-menu"><div class="chips" id="chips"></div><ul class="menu" id="list"></ul></section>
+    <section id="v-menu" hidden><div class="chips" id="chips"></div><ul class="menu" id="list"></ul></section>
     <section id="v-orders" hidden></section>
-    <section id="v-track" hidden></section>
     <div id="cartbar"></div><div id="sheet"></div><div id="zoom"></div></div>`;
 
+  /* ---------- menu ---------- */
   const renderChips = () => $('#chips').innerHTML = CONFIG.MENU.map(c =>
     `<button class="chip ${c.cat === S.cat ? 'on' : ''}" data-act="cat" data-v="${esc(c.cat)}">${bi(c.cat, c.hi)}</button>`).join('');
   const stepper = (id, q) => `<div class="step"><button data-act="sub" data-v="${id}" aria-label="Remove one">−</button><span>${q}</span><button data-act="add" data-v="${id}" aria-label="Add one">+</button></div>`;
@@ -947,7 +1078,7 @@ function customerView(tableNo) {
     $('#list').innerHTML = cat.items.map(itemRow).join('');
   };
   const renderBar = () => {
-    $('#cartbar').innerHTML = (S.tab === 'menu' && cnt()) ? `<div class="cb"><div class="cbl"><div class="thumbs">${Object.keys(S.cart).slice(0, 4).map(k => picOf(items[k], 'tb')).join('')}</div><div><b>${rupee(total())}</b><div class="sub">${bi(`${cnt()} item${cnt() > 1 ? 's' : ''} added`, `${cnt()} आइटम जोड़े गए`)}</div></div></div><button class="btn gold" data-act="opencart">${L('View order')}</button></div>` : '';
+    $('#cartbar').innerHTML = (S.screen === 'menu' && cnt()) ? `<div class="cb"><div class="cbl"><div class="thumbs">${Object.keys(S.cart).slice(0, 4).map(k => picOf(items[k], 'tb')).join('')}</div><div><b>${rupee(total())}</b><div class="sub">${bi(`${cnt()} item${cnt() > 1 ? 's' : ''} added`, `${cnt()} आइटम जोड़े गए`)}</div></div></div><button class="btn gold" data-act="opencart">${L('View order')}</button></div>` : '';
   };
   const renderSheet = () => {
     const el = $('#sheet');
@@ -955,88 +1086,123 @@ function customerView(tableNo) {
     const lines = Object.entries(S.cart).map(([id, q]) => { const i = items[id]; return `<div class="ln">${picOf(i, 'thumb')}<div><div class="nm">${bi(i.name, i.hi)}</div><div class="ds">${bi(`${rupee(i.price)} each`, `${rupee(i.price)} प्रति`)}</div></div>${stepper(id, q)}<div class="lt">${rupee(i.price * q)}</div></div>`; }).join('');
     el.innerHTML = `<div class="scrim" data-act="closecart"></div><div class="sheet" role="dialog" aria-label="Your order">
       <div class="sh-h"><h2>${bi('Your order · Table ' + tableNo, 'आपका ऑर्डर · टेबल ' + tableNo)}</h2><button data-act="closecart" aria-label="Close">✕</button></div>
-      <div class="sh-b">${lines}<label class="fl">${L('Note for kitchen (optional)')}<textarea id="note" rows="2" maxlength="140" placeholder="e.g. less spicy, no onion / जैसे कम तीखा, बिना प्याज़">${esc(S.note)}</textarea></label></div>
+      <div class="sh-b">${lines}
+        <label class="fl">${L('Mobile number')} <span class="mute">${L('(needed to see your orders and bill)')}</span><input id="phone" class="tkin" inputmode="numeric" maxlength="10" autocomplete="tel" placeholder="98XXXXXXXX" value="${esc(S.draft)}"></label>
+        <p class="ds" style="margin-top:-6px">${L('We use your number only to show your orders and bill. It is deleted the next day.')}</p>
+        <label class="fl">${L('Note for kitchen (optional)')}<textarea id="note" rows="2" maxlength="140" placeholder="e.g. less spicy, no onion / जैसे कम तीखा, बिना प्याज़">${esc(S.note)}</textarea></label></div>
       <div class="sh-f"><div class="tot"><span>${L('Total')}</span><b>${rupee(total())}</b></div><button class="btn gold" data-act="place" ${S.sending ? 'disabled' : ''}>${S.sending ? L('Sending…') : L('Send order to kitchen')}</button></div></div>`;
   };
   const refreshCart = () => { renderList(); renderBar(); renderSheet(); };
-  const showTab = () => {
-    $('#v-menu').hidden = S.tab !== 'menu'; $('#v-orders').hidden = S.tab !== 'orders';
-    $('#v-track').hidden = S.tab !== 'track';
-    $('#t-menu').classList.toggle('on', S.tab === 'menu'); $('#t-orders').classList.toggle('on', S.tab === 'orders'); $('#t-track').classList.toggle('on', S.tab === 'track');
-    renderBar(); if (S.tab === 'orders') renderOrders(true);
-  };
 
+  /* ---------- bhasha aur waiter ---------- */
   const modeLabel = { auto: 'EN ⇄ हिं', en: 'EN', hi: 'हिं' };
   const applyLang = () => {
     $('#langbtn').textContent = modeLabel[LANG.mode];
+    ['hi', 'en', 'auto'].forEach(m => { const b = $('#sg-' + m); if (b) b.classList.toggle('on', LANG.mode === m); });
     document.querySelectorAll('.bi').forEach(el => { el.textContent = el.dataset[LANG.now] || el.dataset.en; });
   };
-  const tracker = makeTracker($('#v-track'));
-  const upiLink = amt => `upi://pay?pa=${encodeURIComponent(CONFIG.UPI_ID)}&pn=${encodeURIComponent(CONFIG.UPI_NAME)}&am=${amt}&cu=INR&tn=${encodeURIComponent('Table ' + tableNo)}`;
-  const stages = ['new', 'cooking', 'ready', 'served'], stageName = ['Received', 'Preparing', 'Ready to serve', 'Served'];
-  const stageMsg = { new: 'Order received. The kitchen will start soon.', cooking: 'Your food is being prepared.', ready: 'Ready! Your food is coming to your table.', served: 'Served. Enjoy your meal!' };
-  const stageAt = o => [o.created_at, o.cooking_at, o.ready_at, o.served_at];
-  const paidRecent = () => S.orders.filter(o => o.pay_status === 'paid' && !S.hidden.includes(o.id) && Date.now() - new Date(o.paid_at || o.created_at) < (o.paid_at ? 45 : 90) * 6e4).sort(byTime);
-  function receiptCard(list) {
-    const b = billData(list);
-    return `<div class="rcard"><div class="rh">${CONFIG.LOGO ? `<img class="hlogo" src="${CONFIG.LOGO}" alt="">` : ''}<div><h3>${L('Payment receipt')}</h3><div class="rm">${esc(CONFIG.NAME)} · ${bi('Table ' + tableNo, 'टेबल ' + tableNo)}</div></div></div>
-      <div class="rm">${bi('Orders ' + b.nums, 'ऑर्डर ' + b.nums)}</div>
-      <div class="rm">${bi('Ordered: ' + fdt(b.orderedAt), 'ऑर्डर किया: ' + fdt(b.orderedAt))}</div>
+  const updateWaiter = () => document.querySelectorAll('.wbtn').forEach(b => {
+    b.disabled = S.waiting;
+    b.innerHTML = (b.dataset.i ? b.dataset.i + ' ' : '') + (S.waiting ? L('Waiter is coming') : L('Call waiter'));
+  });
+
+  /* ---------- purane ऑर्डर / bill (mobile number se) ---------- */
+  const phoneCard = () => `<div class="tk"><h3 style="font-size:20px">${L('Enter your mobile number')}</h3>
+    <p class="ds" style="margin:6px 0 10px">${L('We use your number only to show your orders and bill. It is deleted the next day.')}</p>
+    <input id="ph" class="tkin" inputmode="numeric" maxlength="10" autocomplete="tel" placeholder="98XXXXXXXX" value="${esc(S.draft)}">
+    ${S.err ? `<div class="msg err">${L(S.err)}</div>` : ''}
+    <button class="btn gold" data-act="seeorders">${L('Show my orders')}</button></div>`;
+
+  function billCard(b) {
+    let st;
+    if (b.state === 'paid') st = ['ok', bi('Paid ✓' + (b.paidAt ? ' · ' + fdt(b.paidAt) : ''), 'भुगतान हो गया ✓' + (b.paidAt ? ' · ' + fdt(b.paidAt) : ''))];
+    else if (b.state === 'claimed') st = ['wait', L('Payment verification pending')];
+    else if (b.state === 'partial') st = ['wait', bi(`Partly paid · Paid ${rupee(b.paidAmt)} · Pending ${rupee(b.total - b.paidAmt)}`, `आंशिक भुगतान · दिया ${rupee(b.paidAmt)} · बाकी ${rupee(b.total - b.paidAmt)}`)];
+    else st = ['wait', L('Payment pending')];
+    return `<div class="rcard"><div class="rh">${CONFIG.LOGO ? `<img class="hlogo" src="${CONFIG.LOGO}" alt="">` : ''}<div><h3>${L("Today's bill")}</h3><div class="rm">${esc(CONFIG.NAME)}</div></div></div>
+      <div class="rm">${bi('Table ' + b.tables, 'टेबल ' + b.tables)} · ${bi('Orders ' + b.nums, 'ऑर्डर ' + b.nums)}</div>
+      <div class="rm">${bi('First order: ' + fdt(b.orderedAt), 'पहला ऑर्डर: ' + fdt(b.orderedAt))}</div>
       ${b.readyAt ? `<div class="rm">${bi('Food ready: ' + fdt(b.readyAt), 'खाना तैयार: ' + fdt(b.readyAt))}</div>` : ''}
-      ${b.paidAt ? `<div class="rm">${bi('Paid: ' + fdt(b.paidAt), 'पेमेंट: ' + fdt(b.paidAt))}</div>` : ''}
       <div style="margin-top:8px">${b.lines.map(i => `<div class="rl"><span>${i.qty} × ${nm(i)} <span class="mute">@${rupee(i.price)}</span></span><span>${rupee(i.price * i.qty)}</span></div>`).join('')}</div>
-      <div class="rt"><span>${L('Total paid')}</span><span>${rupee(b.total)}</span></div>
-      <div class="rm">${bi('Paid by: ' + b.method, 'भुगतान: ' + (b.method === 'Cash' ? 'नकद' : 'ऑनलाइन (UPI)'))}</div>
-      <p style="margin-top:8px;font-weight:600">${L('Thank you! Visit again.')}</p>
-      <div class="row"><button class="btn teal" data-act="printbill">${L('Save / Print bill')}</button><button class="btn line" data-act="hidebill">${L('Hide')}</button></div></div>`;
+      <div class="rt"><span>${L('Total')}</span><span>${rupee(b.total)}</span></div>
+      <div class="pst ${st[0]}">${st[1]}</div>
+      ${b.method ? `<div class="rm">${bi('Method: ' + b.method, 'तरीका: ' + (b.method === 'Cash' ? 'नकद' : 'ऑनलाइन (UPI)'))}</div>` : ''}
+      <div class="row"><button class="btn teal" data-act="dlbill">${L('Download bill')}</button><button class="btn line" data-act="printbill">${L('Print')}</button></div></div>`;
+  }
+
+  function ratingCard(list) {
+    const done = list.some(o => o.status === 'served' || o.pay_status === 'paid' || o.pay_status === 'claimed');
+    if (!done) return '';
+    if (list.every(o => o.rated)) return `<div class="rcard"><h3>${L('Thank you for your feedback!')}</h3></div>`;
+    return `<div class="rcard"><h3>${L('Rate your experience')}</h3>
+      <div class="stars">${[1, 2, 3, 4, 5].map(n => `<button class="star ${n <= S.rate.stars ? 'on' : ''}" data-act="rate" data-v="${n}" aria-label="${n} star">★</button>`).join('')}</div>
+      <textarea id="rcomment" class="rtext" rows="2" maxlength="200" placeholder="कुछ कहना है? / Any comments? (optional)">${esc(S.rate.comment)}</textarea>
+      <button class="btn gold" data-act="sendrate" ${S.rate.stars ? '' : 'disabled'}>${L('Submit rating')}</button></div>`;
   }
 
   function renderOrders(force) {
-    const mine = S.orders.filter(o => Date.now() - new Date(o.created_at) < 12 * 36e5).sort(byTime);
-    const unpaid = mine.filter(o => o.pay_status !== 'paid');
-    const rec = paidRecent();
-    const sig = JSON.stringify([unpaid, rec]) + mine.length;
-    $('#ob').textContent = unpaid.length ? ' (' + unpaid.length + ')' : '';
-    if (S.tab !== 'orders' || (!force && sig === S.sig)) return;
-    S.sig = sig;
     const el = $('#v-orders');
-    if (!unpaid.length) {
-      el.innerHTML = rec.length
-        ? `<div class="msg"><b>${L('Payment received. Thank you!')}</b><br>${L('Order again anytime from the Menu tab.')}</div>` + receiptCard(rec)
-        : `<div class="empty">${L('No orders yet.')}<br>${L('Pick something from the menu.')}<br><button class="btn gold" data-act="tab" data-v="menu">${L('Open menu')}</button></div>`;
+    if (!S.phone) {
+      if (force || S.sig !== 'nophone') { S.sig = 'nophone'; el.innerHTML = phoneCard(); }
       return;
     }
-    const amt = sum(unpaid, o => o.total);
-    const allSet = unpaid.every(o => o.pay_method);
-    const method = allSet ? unpaid[0].pay_method : null;
-    const claimed = allSet && unpaid.every(o => o.pay_status === 'claimed');
-    const onlineOK = !!CONFIG.UPI_ID;
-    let pay = '';
-    if (claimed) {
-      pay = `<div class="pay"><h3><span>${L('Bill')}</span><span>${rupee(amt)}</span></h3><p>${L('Thank you! The counter is confirming your payment.')}</p></div>`;
-    } else if (method === 'cash') {
-      pay = `<div class="pay"><h3><span>${L('Bill')}</span><span>${rupee(amt)}</span></h3><p>${bi(`Please pay ${rupee(amt)} in cash at the counter. Staff has been told.`, `कृपया काउंटर पर ${rupee(amt)} नकद दें। स्टाफ़ को बता दिया गया है।`)}</p><div class="row"><button class="btn line" data-act="changepay">${L('Change method')}</button></div></div>`;
-    } else if (method === 'online') {
-      pay = `<div class="pay"><h3><span>${L('Pay online')}</span><span>${rupee(amt)}</span></h3><div class="upi"><div id="upiqr"></div><p class="ds">${bi(`Scan with any UPI app and pay ${rupee(amt)}`, `किसी भी UPI ऐप से स्कैन करके ${rupee(amt)} दें`)}</p><a class="btn teal sm" href="${upiLink(amt)}">${L('Open UPI app')}</a></div><div class="row"><button class="btn gold" data-act="paid">${L('I have paid')}</button><button class="btn line" data-act="changepay">${L('Change method')}</button></div></div>`;
-    } else {
-      pay = `<div class="pay"><h3><span>${L('Bill so far')}</span><span>${rupee(amt)}</span></h3><p class="ds">${L('Want something more? Order again from the Menu tab. When you are done, choose how to pay.')}</p><div class="row"><button class="btn teal" data-act="paycash">${L('Pay cash')}</button>${onlineOK ? `<button class="btn teal" data-act="payonline">${L('Pay online')}</button>` : ''}</div></div>`;
+    if (!S.loaded) { el.innerHTML = `<div class="empty">${L('Loading…')}</div>`; return; }
+    const list = S.orders.slice().sort(byTime);
+    const sig = S.phone + '|' + S.fail + '|' + JSON.stringify(list);
+    if (!force && sig === S.sig) return;
+    S.sig = sig;
+    const head = `<div class="oc" style="background:#F1F7F4"><h3><span>📱 ${maskPhone(S.phone)}</span><button class="lnk" data-act="changenum">${L('Change number')}</button></h3></div>`;
+    if (S.fail && !list.length) { el.innerHTML = head + `<div class="empty">${L('Could not load your orders. Please check your internet.')}</div>`; return; }
+    if (!list.length) {
+      el.innerHTML = head + `<div class="empty">${L('No orders found for this number today.')}${only ? '' : `<br><button class="btn gold" data-act="go" data-v="menu">${L('Place a new order')}</button>`}</div>`;
+      return;
     }
-    el.innerHTML = unpaid.map(o => {
+    const open = list.filter(o => o.pay_status !== 'paid' && o.pay_status !== 'claimed');
+    const claimedList = list.filter(o => o.pay_status === 'claimed');
+    let pay = '';
+    S.qr = null;
+    if (open.length) {
+      const amt = sum(open, o => o.total), allSet = open.every(o => o.pay_method), method = allSet ? open[0].pay_method : null;
+      const tbl = open[open.length - 1].table_no;
+      if (method === 'cash') {
+        pay = `<div class="pay"><h3><span>${L('Bill')}</span><span>${rupee(amt)}</span></h3><p>${bi(`Please pay ${rupee(amt)} in cash at the counter. Staff has been told.`, `कृपया काउंटर पर ${rupee(amt)} नकद दें। स्टाफ़ को बता दिया गया है।`)}</p><div class="row"><button class="btn line" data-act="changepay">${L('Change method')}</button></div></div>`;
+      } else if (method === 'online') {
+        S.qr = { amt, tbl };
+        pay = `<div class="pay"><h3><span>${L('Pay online')}</span><span>${rupee(amt)}</span></h3><div class="upi"><div id="upiqr"></div><p class="ds">${bi(`Scan with any UPI app and pay ${rupee(amt)}`, `किसी भी UPI ऐप से स्कैन करके ${rupee(amt)} दें`)}</p><a class="btn teal sm" href="${upiLink(amt, tbl)}">${L('Open UPI app')}</a></div>
+          <p class="ds" style="margin-top:10px">${L('After paying, tap the button below.')}</p>
+          <div class="row"><button class="btn gold" data-act="paid">${L('I have paid online')}</button><button class="btn line" data-act="changepay">${L('Change method')}</button></div></div>`;
+      } else {
+        pay = `<div class="pay"><h3><span>${L('Bill so far')}</span><span>${rupee(amt)}</span></h3><p class="ds">${L('Want something more? Order again from the Menu tab. When you are done, choose how to pay.')}</p><div class="row"><button class="btn teal" data-act="paycash">${L('Pay cash')}</button>${CONFIG.UPI_ID ? `<button class="btn teal" data-act="payonline">${L('Pay online')}</button>` : ''}</div></div>`;
+      }
+    } else if (claimedList.length) {
+      pay = `<div class="pay"><h3><span>${L('Bill')}</span><span>${rupee(sum(claimedList, o => o.total))}</span></h3><p>${L('The counter will check your payment. Your bill is ready below.')}</p></div>`;
+    } else {
+      pay = `<div class="msg"><b>${L('Payment received. Thank you!')}</b></div>`;
+    }
+    const cards = list.map(o => {
       const idx = Math.max(0, stages.indexOf(o.status)), at = stageAt(o);
       return `<div class="oc"><h3><span>${bi('Order #' + o.num, 'ऑर्डर #' + o.num)}</span><span class="mute">${tm(o.created_at)}</span></h3>
         <div class="stmsg ${o.status}">${L(stageMsg[o.status] || '')}</div>
         <ol class="prog">${stageName.map((n, i) => `<li class="${i <= idx ? 'done' : ''}">${L(n)}${at[i] ? `<small>${tm(at[i])}</small>` : ''}</li>`).join('')}</ol>
         ${o.items.map(i => `<div class="li"><span>${i.qty} × ${nm(i)}</span><span>${rupee(i.price * i.qty)}</span></div>`).join('')}
         ${o.note ? `<div class="ds">${L('Note:')} ${esc(o.note)}</div>` : ''}</div>`;
-    }).join('') + pay + (rec.length ? receiptCard(rec) : '');
-    if (method === 'online' && !claimed && window.QRCode) new QRCode($('#upiqr'), { text: upiLink(amt), width: 190, height: 190 });
+    }).join('');
+    el.innerHTML = head + cards + pay + billCard(billInfo(list)) + ratingCard(list);
+    if (S.qr && window.QRCode && $('#upiqr')) new QRCode($('#upiqr'), { text: upiLink(S.qr.amt, S.qr.tbl), width: 190, height: 190 });
   }
 
-  const unpaidNow = () => S.orders.filter(o => o.pay_status !== 'paid' && Date.now() - new Date(o.created_at) < 12 * 36e5);
-  const sync = startSync(async () => {
-    const d = await store.load(tableNo);
-    S.orders = d.orders; S.calls = d.calls;
-    d.orders.forEach(o => {
+  async function refreshOrders(force) {
+    if (!S.phone) return;
+    try {
+      S.orders = await store.myOrders(S.phone);
+      S.fail = false;
+    } catch (e) {
+      console.error(e); S.fail = true;
+      if (!S.loaded) { S.loaded = true; S.orders = []; }
+      renderOrders(!!force); return;
+    }
+    S.loaded = true;
+    S.orders.forEach(o => {
       const p = S.prev[o.id];
       if (p && p !== o.status) {
         if (o.status === 'cooking') toast(tt('Kitchen has started preparing your order', 'रसोई ने आपका ऑर्डर बनाना शुरू कर दिया है'));
@@ -1044,43 +1210,86 @@ function customerView(tableNo) {
       }
       S.prev[o.id] = o.status;
     });
-    const w = S.calls.some(c => c.kind === 'waiter' && !c.done);
-    const b = $('#waiter'); b.disabled = w; b.innerHTML = w ? L('Waiter is coming') : L('Call waiter');
-    renderOrders(false);
-  });
+    renderOrders(!!force);
+  }
+
+  const showScreen = () => {
+    const sc = S.screen;
+    $('#v-home').hidden = sc !== 'home'; $('#v-menu').hidden = sc !== 'menu'; $('#v-orders').hidden = sc !== 'orders';
+    $('#bar').hidden = sc === 'home';
+    const tmn = $('#t-menu'), tor = $('#t-orders');
+    if (tmn) { tmn.classList.toggle('on', sc === 'menu'); tor.classList.toggle('on', sc === 'orders'); }
+    renderBar();
+    if (sc === 'orders') { renderOrders(true); if (S.phone) refreshOrders(true); }
+  };
+
+  const sync = startSync(async () => {
+    await refreshOrders(false);
+    if (!only) {
+      try { S.waiting = await store.waiterPending(tableNo); } catch (e) { /* internet na ho to purani sthiti rehne do */ }
+      updateWaiter();
+    }
+  }, { every: 5000 });
+
+  const payDo = async action => {
+    try { await store.payAction(S.phone, action); }
+    catch (e) { console.error(e); toast(tt('Something went wrong. Please try again.', 'कुछ गड़बड़ हुई। कृपया फिर कोशिश करें।'), true); }
+    await refreshOrders(true);
+  };
 
   H = {
+    go: v => { if (only && v !== 'orders') return; S.screen = v; showScreen(); window.scrollTo(0, 0); },
     cat: v => { S.cat = v; renderChips(); renderList(); },
-    tab: v => { S.tab = v; showTab(); window.scrollTo(0, 0); },
     add: v => { S.cart[v] = (S.cart[v] || 0) + 1; refreshCart(); },
     sub: v => { if (S.cart[v] > 1) S.cart[v]--; else delete S.cart[v]; if (!cnt()) S.sheet = false; refreshCart(); },
     opencart: () => { S.sheet = true; renderSheet(); },
     closecart: () => { S.sheet = false; renderSheet(); },
     place: async () => {
       if (S.sending || !cnt()) return;
+      const ph = (S.draft || '').trim();
+      if (!PHONE_RE.test(ph)) {
+        toast(tt('Enter a valid 10-digit mobile number.', 'कृपया सही 10 अंक का मोबाइल नंबर डालें।'), true);
+        const el = $('#phone'); if (el) el.focus();
+        return;
+      }
       S.sending = true; renderSheet();
       try {
         const lines = Object.entries(S.cart).map(([id, q]) => ({ id, name: items[id].name, price: items[id].price, qty: q }));
-        const row = await store.addOrder({ table_no: tableNo, items: lines, total: total(), note: S.note.trim() || null });
-        S.cart = {}; S.note = ''; S.sheet = false; S.tab = 'orders';
+        const row = await store.placeOrder({ table_no: tableNo, items: lines, total: total(), note: S.note.trim() || null, phone: ph });
+        S.phone = ph; ls.set('vfe_phone', ph);
+        S.cart = {}; S.note = ''; S.sheet = false; S.screen = 'orders'; S.sig = ''; S.loaded = false;
         toast(tt('Order #' + row.num + ' sent to the kitchen', 'ऑर्डर #' + row.num + ' रसोई में भेज दिया गया'));
       } catch (e) { console.error(e); toast(tt('Could not send the order. Check your internet and try again.', 'ऑर्डर नहीं भेज पाए। इंटरनेट जाँचकर फिर कोशिश करें।'), true); }
-      S.sending = false; refreshCart(); showTab(); await sync();
+      S.sending = false; refreshCart(); showScreen();
     },
-    waiter: async () => { await store.addCall({ table_no: tableNo, kind: 'waiter', note: null }); toast(tt('Waiter has been called', 'वेटर को बुला लिया गया है')); await sync(); },
-    paycash: async () => {
-      const u = unpaidNow(), amt = sum(u, o => o.total);
-      await store.patchOrders(u.map(o => o.id), { pay_method: 'cash' });
-      await store.addCall({ table_no: tableNo, kind: 'bill', note: `Wants to pay ${rupee(amt)} in cash` });
-      toast(tt('Counter has been told', 'काउंटर को बता दिया गया है')); await sync(); renderOrders(true);
+    waiter: async () => {
+      try { await store.callWaiter(tableNo); S.waiting = true; updateWaiter(); toast(tt('Waiter has been called', 'वेटर को बुला लिया गया है')); }
+      catch (e) { console.error(e); toast(tt('Could not call the waiter. Please try again.', 'वेटर को बुला नहीं पाए। कृपया फिर कोशिश करें।'), true); }
     },
-    payonline: async () => { await store.patchOrders(unpaidNow().map(o => o.id), { pay_method: 'online' }); await sync(); renderOrders(true); },
-    paid: async () => {
-      const u = unpaidNow(), amt = sum(u, o => o.total);
-      await store.patchOrders(u.map(o => o.id), { pay_status: 'claimed' });
-      await store.addCall({ table_no: tableNo, kind: 'bill', note: `Says paid ${rupee(amt)} online. Please check and confirm` });
-      toast(tt('Thank you!', 'धन्यवाद!')); await sync(); renderOrders(true);
+    seeorders: async () => {
+      const v = (($('#ph') || {}).value || '').replace(/\D/g, '');
+      S.draft = v;
+      if (!PHONE_RE.test(v)) { S.err = 'Enter a valid 10-digit mobile number.'; renderOrders(true); return; }
+      S.err = ''; S.phone = v; ls.set('vfe_phone', v); S.loaded = false; S.sig = '';
+      renderOrders(true); await refreshOrders(true);
     },
+    changenum: () => { S.phone = ''; S.draft = ''; ls.set('vfe_phone', ''); S.orders = []; S.loaded = false; S.err = ''; S.sig = ''; renderOrders(true); },
+    paycash: async () => { await payDo('cash'); toast(tt('Counter has been told', 'काउंटर को बता दिया गया है')); },
+    payonline: () => payDo('online'),
+    paid: async () => { await payDo('claimed'); toast(tt('Thank you! Your bill is ready.', 'धन्यवाद! आपका बिल तैयार है।')); },
+    changepay: () => payDo('reset'),
+    rate: v => { S.rate.stars = +v; renderOrders(true); },
+    sendrate: async () => {
+      if (!S.rate.stars) return;
+      try {
+        await store.submitRating(S.phone, S.rate.stars, S.rate.comment);
+        S.rate = { stars: 0, comment: '' };
+        toast(tt('Thank you for your feedback!', 'आपकी राय के लिए धन्यवाद!'));
+      } catch (e) { console.error(e); toast(tt('Could not send the rating. Please try again.', 'रेटिंग नहीं भेज पाए। कृपया फिर कोशिश करें।'), true); }
+      await refreshOrders(true);
+    },
+    dlbill: () => downloadBill(S.orders.slice().sort(byTime), S.phone),
+    printbill: () => { if (S.orders.length) printHtml(slipReceipt(S.orders.slice().sort(byTime), S.phone)); },
     zoom: v => {
       const it = base[v], first = items[(it.variants && it.variants.length) ? it.id + ':' + it.variants[0].id : it.id];
       $('#zoom').innerHTML = `<div class="zoom" data-act="closezoom"><img src="${first.img}" alt="${esc(it.name)}"><h2>${bi(it.name, it.hi)}</h2>${it.desc ? `<p>${bi(it.desc, it.descHi)}</p>` : ''}<button class="x" data-act="closezoom">${L('Close')}</button></div>`;
@@ -1091,14 +1300,23 @@ function customerView(tableNo) {
       if (LANG.mode !== 'auto') LANG.now = LANG.mode;
       ls.set('vfe_lang', LANG.mode); applyLang();
     },
-    track: () => tracker.check(),
-    printbill: () => { const r = paidRecent(); if (r.length) printHtml(slipReceipt(tableNo, r)); },
-    hidebill: () => { S.hidden = S.hidden.concat(paidRecent().map(o => o.id)); ls.set('vfe_hidden', S.hidden.slice(-60)); renderOrders(true); },
-    changepay: async () => { await store.patchOrders(unpaidNow().map(o => o.id), { pay_method: null, pay_status: 'unpaid' }); await sync(); renderOrders(true); }
+    setlang: v => {
+      LANG.mode = v; if (v !== 'auto') LANG.now = v;
+      ls.set('vfe_lang', v); applyLang();
+    }
   };
-  document.addEventListener('input', e => { if (e.target.id === 'note') S.note = e.target.value; });
+  document.addEventListener('input', e => {
+    const id = e.target.id;
+    if (id === 'note') S.note = e.target.value;
+    if (id === 'rcomment') S.rate.comment = e.target.value;
+    if (id === 'phone' || id === 'ph') {
+      const v = e.target.value.replace(/\D/g, '').slice(0, 10);
+      if (v !== e.target.value) e.target.value = v;
+      S.draft = v;
+    }
+  });
 
-  renderChips(); refreshCart(); applyLang(); sync();
+  renderChips(); refreshCart(); applyLang(); updateWaiter(); showScreen(); sync();
 }
 
 /* ==========================================================
@@ -1133,9 +1351,9 @@ const waiterBeep = () => {
   try { navigator.vibrate && navigator.vibrate([300, 150, 300]); } catch (e) {}
 };
 
-function counterView() {
-  document.title = 'Counter · ' + CONFIG.NAME;
-  if (ls.get('vfe_auth') !== CONFIG.COUNTER_PIN) {
+let cleanupTimer = null;
+function loginScreen() {
+  if (DEMO) {
     $('#app').innerHTML = `${demoBar()}<div class="login"><h1 class="brand">${esc(CONFIG.NAME)}</h1><p class="mute">Counter login</p>
       <input id="pin" type="password" inputmode="numeric" autocomplete="off" aria-label="PIN" placeholder="PIN">
       <button class="btn teal" data-act="login">Open counter</button></div>`;
@@ -1144,12 +1362,33 @@ function counterView() {
     $('#pin').addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
     return;
   }
-  const C = { tab: 'orders', orders: [], calls: [], seen: null, seenC: null, sound: true, auto: ls.get('vfe_autoprint') === true };
+  $('#app').innerHTML = `<div class="login"><h1 class="brand">${esc(CONFIG.NAME)}</h1><p class="mute">Counter login</p>
+    <input id="em" class="lgi" type="email" autocomplete="username" placeholder="Email">
+    <input id="pw" class="lgi" type="password" autocomplete="current-password" placeholder="Password">
+    <button class="btn teal" data-act="login">Open counter</button></div>`;
+  const go = async () => {
+    const { error } = await sb.auth.signInWithPassword({ email: $('#em').value.trim().toLowerCase(), password: $('#pw').value });
+    if (error) { toast('Wrong email or password', true); return; }
+    beep(); counterView();
+  };
+  H = { login: go };
+  $('#pw').addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
+}
+
+async function counterView() {
+  document.title = 'Counter · ' + CONFIG.NAME;
+  let authed;
+  if (DEMO) authed = ls.get('vfe_auth') === CONFIG.COUNTER_PIN;
+  else { const { data } = await sb.auth.getSession(); authed = !!(data && data.session); }
+  if (!authed) { loginScreen(); return; }
+
+  const C = { tab: 'orders', orders: [], calls: [], ratings: [], seen: null, seenC: null, sound: true, auto: ls.get('vfe_autoprint') === true };
   const nextOf = { new: ['cooking', 'Start cooking'], cooking: ['ready', 'Mark ready'], ready: ['served', 'Mark served'] };
   const payChip = o => `<span class="chipst ${o.pay_status}">${o.pay_status === 'paid' ? 'Paid' : o.pay_status === 'claimed' ? 'Says paid (online)' : o.pay_method === 'cash' ? 'Will pay cash' : o.pay_method === 'online' ? 'Paying online' : 'Unpaid'}</span>`;
+  const stars = n => '★'.repeat(n) + '☆'.repeat(5 - n);
 
   function orderCard(o) {
-    return `<div class="oc2 ${o.status}"><div class="hd"><div class="tn"><small>Table</small>${o.table_no}</div><div class="meta">Order #${o.num}<br>${tm(o.created_at)} · ${ago(o.created_at)}</div></div>
+    return `<div class="oc2 ${o.status}"><div class="hd"><div class="tn"><small>Table</small>${o.table_no}</div><div class="meta">Order #${o.num}${o.phone ? ' · 📱 ' + esc(o.phone) : ''}<br>${tm(o.created_at)} · ${ago(o.created_at)}</div></div>
       <ul>${o.items.map(i => `<li><b>${i.qty}×</b> ${esc(i.name)}</li>`).join('')}</ul>
       ${o.note ? `<div class="note">Note: ${esc(o.note)}</div>` : ''}
       <div>${rupee(o.total)} ${payChip(o)}</div>
@@ -1170,26 +1409,39 @@ function counterView() {
       for (let t = 1; t <= CONFIG.TABLES; t++) {
         const u = C.orders.filter(o => o.table_no === t && o.pay_status !== 'paid');
         const amt = sum(u, o => o.total), wants = C.calls.some(c => c.table_no === t && c.kind === 'bill' && !c.done);
+        const hasClaim = u.some(o => o.pay_status === 'claimed');
         const how = !u.length ? '' : u.every(o => o.pay_status === 'claimed') ? 'Says paid online. Check your UPI app.' : u.every(o => o.pay_method === 'cash') ? 'Will pay cash' : u.every(o => o.pay_method === 'online') ? 'Paying online' : 'Still eating';
         cards += `<div class="tcard ${u.length ? (wants ? 'pay' : 'busy') : ''}"><div class="tn"><small>Table</small>${t}</div>
           ${u.length ? `<div class="amt">${rupee(amt)}</div><div class="ds">${how}</div>
-          <div class="acts"><button class="btn line sm" data-act="bill" data-v="${t}">Print bill</button><button class="btn teal sm" data-act="paid" data-v="${t}">Mark paid</button></div>` : '<div class="mute">Free</div>'}</div>`;
+          <div class="acts"><button class="btn line sm" data-act="bill" data-v="${t}">Print bill</button><button class="btn teal sm" data-act="paid" data-v="${t}">Mark paid</button></div>
+          ${hasClaim ? `<div class="acts" style="grid-template-columns:1fr"><button class="btn line sm" style="border-color:#C0392B;color:#C0392B" data-act="notrecv" data-v="${t}">Payment not received</button></div>` : ''}` : '<div class="mute">Free</div>'}</div>`;
       }
       body = `<div class="tgrid">${cards}</div>`;
+    } else if (C.tab === 'ratings') {
+      const r = C.ratings, avg = r.length ? (sum(r, x => x.stars) / r.length) : 0;
+      body = `<div class="stats"><div class="stat">Average / औसत रेटिंग<b>${r.length ? avg.toFixed(1) + ' ★' : '—'}</b></div><div class="stat">Ratings / रेटिंग की संख्या<b>${r.length}</b></div></div>
+        <table class="tbl"><tr><th>When</th><th>Table</th><th>Stars</th><th>Comment</th></tr>${r.map(x => `<tr><td>${fdt(x.created_at)}</td><td>${x.table_no || ''}</td><td style="color:#C98A00;white-space:nowrap">${stars(x.stars)}</td><td>${esc(x.comment || '')}</td></tr>`).join('') || '<tr><td colspan="4" class="mute">No ratings yet</td></tr>'}</table>`;
     } else {
-      const today = C.orders.filter(o => sameDay(o.created_at)), paid = today.filter(o => o.pay_status === 'paid');
+      const today = C.orders, paid = today.filter(o => o.pay_status === 'paid');
       const cash = sum(paid.filter(o => o.pay_method === 'cash'), o => o.total), online = sum(paid.filter(o => o.pay_method !== 'cash'), o => o.total);
       body = `<div class="stats"><div class="stat">Sales received<b>${rupee(cash + online)}</b></div><div class="stat">Cash<b>${rupee(cash)}</b></div><div class="stat">Online<b>${rupee(online)}</b></div><div class="stat">Orders today<b>${today.length}</b></div><div class="stat">Not paid yet<b>${rupee(sum(today.filter(o => o.pay_status !== 'paid'), o => o.total))}</b></div></div>
+        <div style="padding:0 14px 10px"><button class="btn line sm" data-act="exportcsv">Download today's sales (CSV)</button></div>
         <table class="tbl"><tr><th>Time</th><th>Table</th><th>Order</th><th>Amount</th><th>Payment</th></tr>${today.slice().sort((a, b) => byTime(b, a)).map(o => `<tr><td>${tm(o.created_at)}</td><td>${o.table_no}</td><td>#${o.num}</td><td>${rupee(o.total)}</td><td>${payChip(o)}</td></tr>`).join('') || '<tr><td colspan="5" class="mute">No orders today</td></tr>'}</table>`;
     }
     $('#app').innerHTML = `${demoBar()}<div class="cn-top"><span class="brand">${esc(CONFIG.NAME)}</span>
-      ${['orders', 'tables', 'today'].map(t => `<button class="tab ${C.tab === t ? 'on' : ''}" data-act="ctab" data-v="${t}">${{ orders: 'Orders', tables: 'Tables & bills', today: 'Today' }[t]}</button>`).join('')}
+      ${['orders', 'tables', 'today', 'ratings'].map(t => `<button class="tab ${C.tab === t ? 'on' : ''}" data-act="ctab" data-v="${t}">${{ orders: 'Orders', tables: 'Tables & bills', today: 'Today', ratings: 'Ratings' }[t]}</button>`).join('')}
       <div class="sp"><button class="sbtn" data-act="sound">Sound: ${C.sound ? 'On' : 'Off'}</button><label><input type="checkbox" data-act="auto" ${C.auto ? 'checked' : ''}> Auto-print new orders</label><button class="sbtn" data-act="logout">Log out</button></div></div>
-      ${C.sound && !audioOK() ? '<div class="demo" style="background:#FDE2E0;color:#8A1C12;cursor:pointer;font-size:15px;padding:10px" data-act="unlock">Sound abhi band hai. Yahan ek baar dabao, tab alert bajega.</div>' : ''}${calls.length ? `<div class="alerts">${calls.map(c => `<div class="alert ${c.kind}"><span>Table ${c.table_no}: ${c.kind === 'waiter' ? 'needs the waiter' : esc(c.note || 'wants to pay')}</span><button data-act="calldone" data-v="${c.id}">Done</button></div>`).join('')}</div>` : ''}${body}`;
+      ${C.sound && !audioOK() ? '<div class="demo" style="background:#FDE2E0;color:#8A1C12;cursor:pointer;font-size:15px;padding:10px" data-act="unlock">Sound abhi band hai. Yahan ek baar dabao, tab alert bajega.</div>' : ''}${calls.length ? `<div class="alerts">${calls.map(c => `<div class="alert ${c.kind}"><div><b class="at">${c.kind === 'waiter' ? `टेबल ${c.table_no} · Table ${c.table_no}` : `Table ${c.table_no}`}</b><span>${c.kind === 'waiter' ? 'वेटर बुला रहा है · needs the waiter' : esc(c.note || 'wants to pay')} · ${ago(c.created_at)}</span></div><button data-act="calldone" data-v="${c.id}">Done</button></div>`).join('')}</div>` : ''}${body}`;
   }
 
   const sync = startSync(async () => {
-    const d = await store.load();
+    let d;
+    try { d = await store.load(); }
+    catch (e) {
+      if (!DEMO) { const { data } = await sb.auth.getSession(); if (!data.session) { stopSync(); counterView(); return; } }
+      throw e;
+    }
+    if (C.tab === 'ratings') { try { C.ratings = await store.loadRatings(); } catch (e) { console.error(e); } }
     if (C.seen) {
       const nu = d.orders.filter(o => !C.seen.has(o.id)), nc = d.calls.filter(c => !C.seenC.has(c.id) && !c.done);
       if ((nu.length || nc.some(c => c.kind === 'bill')) && C.sound) beep();
@@ -1201,14 +1453,23 @@ function counterView() {
     if (waiting && C.sound) { if (!alarmTimer) { waiterBeep(); alarmTimer = setInterval(waiterBeep, 6000); } }
     else if (alarmTimer) { clearInterval(alarmTimer); alarmTimer = null; }
     render();
-  });
+  }, { realtime: !DEMO, every: DEMO ? 4000 : 15000 });
+
+  // purane mobile number mitane ka kaam (har ghante)
+  store.cleanup().catch(e => console.error(e));
+  clearInterval(cleanupTimer);
+  cleanupTimer = setInterval(() => store.cleanup().catch(() => {}), 36e5);
 
   H = {
-    ctab: v => { C.tab = v; render(); },
+    ctab: async v => { C.tab = v; if (v === 'ratings') { try { C.ratings = await store.loadRatings(); } catch (e) { console.error(e); } } render(); },
     sound: () => { C.sound = !C.sound; if (C.sound) beep(); render(); },
     auto: (v, el) => { C.auto = el.checked; ls.set('vfe_autoprint', C.auto); },
     unlock: () => { unlockAudio(); beep(); render(); },
-    logout: () => { clearInterval(alarmTimer); alarmTimer = null; ls.set('vfe_auth', ''); counterView(); },
+    logout: async () => {
+      clearInterval(alarmTimer); alarmTimer = null; clearInterval(cleanupTimer); stopSync();
+      if (DEMO) ls.set('vfe_auth', ''); else await sb.auth.signOut();
+      counterView();
+    },
     print: v => printHtml(slipOrder(C.orders.find(o => o.id === v))),
     next: async v => { const o = C.orders.find(x => x.id === v), to = nextOf[o.status][0]; await store.patchOrders([v], { status: to, [to + '_at']: new Date().toISOString() }); await sync(); },
     calldone: async v => { await store.patchCalls([v], { done: true }); await sync(); },
@@ -1218,6 +1479,19 @@ function counterView() {
       await store.patchOrders(u.map(o => o.id), { pay_status: 'paid', pay_method: u[0].pay_method || 'cash', paid_at: new Date().toISOString() });
       await store.patchCalls(C.calls.filter(c => c.table_no === t && c.kind === 'bill' && !c.done).map(c => c.id), { done: true });
       toast('Table ' + t + ' marked paid'); await sync();
+    },
+    notrecv: async v => {
+      const t = +v, u = C.orders.filter(o => o.table_no === t && o.pay_status === 'claimed');
+      await store.patchOrders(u.map(o => o.id), { pay_status: 'unpaid', pay_method: null });
+      toast('Table ' + t + ': payment marked as not received'); await sync();
+    },
+    exportcsv: () => {
+      const rows = [['Time', 'Table', 'Order', 'Items', 'Total', 'Payment', 'Method']];
+      C.orders.forEach(o => rows.push([fdt(o.created_at), o.table_no, o.num, o.items.map(i => i.qty + ' x ' + i.name).join('; '), o.total, o.pay_status, o.pay_method || '']));
+      const csv = rows.map(r => r.map(x => '"' + String(x).replace(/"/g, '""') + '"').join(',')).join('\n');
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob(['\ufeff' + csv], { type: 'text/csv' }));
+      a.download = 'sales-' + new Date().toISOString().slice(0, 10) + '.csv'; a.click();
     }
   };
   render(); sync();
@@ -1252,7 +1526,7 @@ function homeView(msg) {
   document.title = CONFIG.NAME;
   $('#app').innerHTML = `${demoBar()}<div class="wrap"><h1 class="brand" style="font-size:30px;color:var(--teal)">${esc(CONFIG.NAME)}</h1>
     ${msg ? `<p>${esc(msg)}</p>` : '<p class="mute">Owner page. Customers seedha apne table ka QR scan karte hain.</p>'}
-    <h3 style="margin-top:20px">Staff</h3><p style="margin:8px 0 16px"><a class="btn teal sm" href="?counter">Open counter</a> <a class="btn line sm" href="?qr">Print table QR codes</a> <a class="btn line sm" href="?track">Track an order</a></p>
+    <h3 style="margin-top:20px">Staff</h3><p style="margin:8px 0 16px"><a class="btn teal sm" href="?counter">Open counter</a> <a class="btn line sm" href="?qr">Print table QR codes</a> <a class="btn line sm" href="?orders">Past orders / bill page</a></p>
     <h3>Try the customer screen</h3><div class="hgrid">${Array.from({ length: CONFIG.TABLES }, (_, i) => `<a href="?table=${i + 1}">Table ${i + 1}</a>`).join('')}</div></div>`;
 }
 
@@ -1260,7 +1534,7 @@ function homeView(msg) {
   const p = new URLSearchParams(location.search), t = parseInt(p.get('table'), 10);
   if (p.has('qr')) qrView();
   else if (p.has('counter')) counterView();
-  else if (p.has('track')) trackerView();
+  else if (p.has('orders') || p.has('track')) customerView(null);
   else if (t >= 1 && t <= CONFIG.TABLES) customerView(t);
   else if (p.has('table')) homeView('This table number is not valid. Please scan the QR code on your table.');
   else homeView();
