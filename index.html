@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="app-build" content="21">
+<meta name="app-build" content="22">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Vrindavan Food Enterprise</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -256,6 +256,33 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
 #splash.open .bl{transform:translate(-105%,105%)}
 #splash.open .br{transform:translate(105%,105%)}
 @media (prefers-reduced-motion:reduce){#splash .dr{transition-duration:.01s}#splash .mid *{animation-duration:.01s!important;animation-delay:0s!important}}
+/* ===== admin + bill popup ===== */
+.adm{max-width:900px;margin:0 auto;padding:0 12px 80px}
+.adm h2{font:700 20px 'Baloo 2',sans-serif;color:var(--teal);margin:18px 0 8px}
+.adm .bar{position:sticky;top:0;z-index:5;background:var(--teal);color:#fff;padding:10px 12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.adm .bar .brand{font:700 18px 'Baloo 2',sans-serif;margin-right:auto}
+.adm .bar button,.adm .bar a{color:#fff;border:1.5px solid rgba(255,255,255,.5);border-radius:999px;padding:6px 12px;font-weight:600;font-size:14px}
+.adm .bar .on{background:var(--gold);color:var(--teal2);border-color:var(--gold)}
+.adm .card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px;margin:10px 0}
+.adm .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:6px 0}
+.adm label{font-size:13px;color:var(--mute);display:block;width:100%}
+.adm input[type=text],.adm input[type=number],.adm textarea,.adm select{border:1.5px solid var(--line);border-radius:10px;padding:9px 10px;font-size:15px;width:100%;background:#fff;color:var(--ink)}
+.adm .f{flex:1 1 140px;min-width:120px}
+.adm .f2{flex:2 1 220px}
+.adm .mini{border:1.5px solid var(--teal);color:var(--teal);border-radius:9px;padding:6px 10px;font-weight:700;font-size:13px;background:#fff}
+.adm .mini.red{border-color:var(--red);color:var(--red)}
+.adm .thumb{width:64px;height:64px;border-radius:10px;object-fit:cover;background:#EEF3F1;border:1px solid var(--line)}
+.adm .itm{border-left:4px solid var(--gold);background:#FBFCFB;border-radius:10px;padding:10px;margin:10px 0}
+.adm .savebar{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:2px solid var(--gold);padding:10px 14px;display:flex;gap:10px;align-items:center;justify-content:space-between;z-index:6}
+.adm .savebar .btn{width:auto;padding:10px 22px}
+.adm table{width:100%;border-collapse:collapse;font-size:14px}
+.adm td,.adm th{padding:6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+#billmodal{position:fixed;inset:0;z-index:9000;background:rgba(5,25,23,.62);display:flex;align-items:center;justify-content:center;padding:14px}
+#billmodal .bx{background:#fff;color:#111;border-radius:16px;max-width:400px;width:100%;max-height:92vh;overflow:auto;padding:18px;font-family:Hind,system-ui,sans-serif;line-height:1.35}
+#billmodal .ba{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+#billmodal .ba button{flex:1 1 90px;padding:11px;border-radius:10px;font-weight:700;font-size:15px;border:2px solid var(--teal);color:var(--teal);background:#fff}
+#billmodal .ba button.p{background:var(--teal);color:#fff}
+@media print{#billmodal{display:none!important}}
 </style>
 </head>
 <body>
@@ -705,7 +732,7 @@ const mem = { orders: [], calls: [], ratings: [] };
 const dRead = k => ls.get('vfe_' + k) || mem[k];
 const dWrite = (k, v) => { mem[k] = v; ls.set('vfe_' + k, v); };
 
-const APP_BUILD = '21';
+const APP_BUILD = '22';
 // naya version GitHub par aaya ho to khuli screen par laal patti dikhao
 async function checkUpdate() {
   try {
@@ -842,6 +869,45 @@ const store = {
     const { error } = await sb.rpc('cleanup_old');
     if (error) throw error;
   }
+};
+
+/* ---------- admin ki settings (menu, rate, UPI, naam...) ---------- */
+function applySettings(x) {
+  if (!x || typeof x !== 'object') return;
+  if (Array.isArray(x.menu) && x.menu.length) CONFIG.MENU = x.menu;
+  if (typeof x.name === 'string' && x.name.trim()) CONFIG.NAME = x.name.trim();
+  if (typeof x.upi_id === 'string') CONFIG.UPI_ID = x.upi_id.trim();
+  if (typeof x.upi_name === 'string' && x.upi_name.trim()) CONFIG.UPI_NAME = x.upi_name.trim();
+  if (x.tables >= 1 && x.tables <= 100) CONFIG.TABLES = x.tables | 0;
+  if (typeof x.logo === 'string' && x.logo.indexOf('data:image/') === 0) CONFIG.LOGO = x.logo;
+  rebuildSku();
+}
+async function loadSettings() {
+  let x = null;
+  try {
+    if (DEMO) x = ls.get('vfe_settings');
+    else {
+      const r = await Promise.race([sb.rpc('get_settings'), new Promise(res => setTimeout(() => res(null), 3500))]);
+      x = r && r.data && r.data.app;
+    }
+  } catch (e) { console.error(e); }
+  applySettings(x);
+}
+store.saveSettings = async function (obj) {
+  if (DEMO) { ls.set('vfe_settings', obj); return; }
+  const { error } = await sb.from('settings').upsert({ key: 'app', value: obj, updated_at: new Date().toISOString() });
+  if (error) throw error;
+};
+store.resetSettings = async function () {
+  if (DEMO) { try { localStorage.removeItem('vfe_settings'); } catch (e) {} return; }
+  const { error } = await sb.from('settings').delete().eq('key', 'app');
+  if (error) throw error;
+};
+store.deleteOrders = async function (ids) {
+  if (!ids.length) return;
+  if (DEMO) { dWrite('orders', dRead('orders').filter(x => !ids.includes(x.id))); return; }
+  const { error } = await sb.from('orders').delete().in('id', ids);
+  if (error) throw error;
 };
 
 let SYNC = { timer: null, ch: null, demo: null };
@@ -986,6 +1052,19 @@ function upiQrImg(amt, t) {
     return c ? c.toDataURL('image/png') : '';
   } catch (e) { return ''; }
 }
+function showBillModal(list, phone, autoPrint) {
+  const old = document.getElementById('billmodal'); if (old) old.remove();
+  const m = document.createElement('div'); m.id = 'billmodal';
+  m.innerHTML = `<div class="bx"><div style="text-align:center;font-weight:700;color:#1E8449;margin-bottom:8px">✓ भुगतान दर्ज हुआ · Payment recorded</div>${billDoc(list, phone)}
+    <div class="ba"><button class="p" id="bm-print">🖨 Print</button><button id="bm-pdf">⬇ PDF</button><button id="bm-x">Close</button></div></div>`;
+  document.body.appendChild(m);
+  const close = () => m.remove();
+  m.querySelector('#bm-x').onclick = close;
+  m.addEventListener('click', e => { if (e.target === m) close(); });
+  m.querySelector('#bm-print').onclick = () => printHtml(slipReceipt(list, phone));
+  m.querySelector('#bm-pdf').onclick = () => downloadBill(list, phone);
+  if (autoPrint) setTimeout(() => printHtml(slipReceipt(list, phone)), 250);
+}
 function slipBill(t, orders) {
   const m = {};
   orders.forEach(o => o.items.forEach(i => { m[i.id] = m[i.id] || { ...i, qty: 0 }; m[i.id].qty += i.qty; }));
@@ -1048,10 +1127,14 @@ const HI = {
 const L = en => bi(en, HI[en]);
 const tt = (en, hi) => LANG.now === 'hi' ? hi : en;
 const SKU_HI = {};
-CONFIG.MENU.forEach(c => c.items.forEach(i => {
-  if (i.variants && i.variants.length) i.variants.forEach(v => { SKU_HI[i.id + ':' + v.id] = (i.hi || i.name) + ' – ' + (v.hi || v.label); });
-  else SKU_HI[i.id] = i.hi;
-}));
+function rebuildSku() {
+  Object.keys(SKU_HI).forEach(k => delete SKU_HI[k]);
+  CONFIG.MENU.forEach(c => c.items.forEach(i => {
+    if (i.variants && i.variants.length) i.variants.forEach(v => { SKU_HI[i.id + ':' + v.id] = (i.hi || i.name) + ' – ' + (v.hi || v.label); });
+    else SKU_HI[i.id] = i.hi;
+  }));
+}
+rebuildSku();
 const nm = i => bi(i.name, SKU_HI[i.id]);
 setInterval(() => {
   if (LANG.mode !== 'auto') return;
@@ -1081,7 +1164,7 @@ function customerView(tableNo) {
   const items = {}, base = {};
   CONFIG.MENU.forEach(c => c.items.forEach(i => {
     base[i.id] = i;
-    const img = i.img || PHOTOS[i.id] || '';
+    const img = i.img !== undefined ? i.img : (PHOTOS[i.id] || '');
     if (i.variants && i.variants.length) i.variants.forEach(v => { items[i.id + ':' + v.id] = { id: i.id + ':' + v.id, base: i.id, name: i.name + ' – ' + v.label, hi: (i.hi || i.name) + ' – ' + (v.hi || v.label), price: v.price, img, available: i.available }; });
     else items[i.id] = { id: i.id, base: i.id, name: i.name, hi: i.hi, price: i.price, img, available: i.available };
   }));
@@ -1475,29 +1558,30 @@ const waiterBeep = () => {
 };
 
 let cleanupTimer = null;
-function loginScreen() {
+function loginScreen0(next) {
   if (DEMO) {
-    $('#app').innerHTML = `${demoBar()}<div class="login"><h1 class="brand">${esc(CONFIG.NAME)}</h1><p class="mute">Counter login</p>
+    $('#app').innerHTML = `${demoBar()}<div class="login"><h1 class="brand">${esc(CONFIG.NAME)}</h1><p class="mute">${next === counterView ? 'Counter login' : 'Admin login'}</p>
       <input id="pin" type="password" inputmode="numeric" autocomplete="off" aria-label="PIN" placeholder="PIN">
       <button class="btn teal" data-act="login">Open counter</button></div>`;
-    const go = () => { if ($('#pin').value === CONFIG.COUNTER_PIN) { ls.set('vfe_auth', CONFIG.COUNTER_PIN); beep(); counterView(); } else toast('Wrong PIN', true); };
+    const go = () => { if ($('#pin').value === CONFIG.COUNTER_PIN) { ls.set('vfe_auth', CONFIG.COUNTER_PIN); beep(); next(); } else toast('Wrong PIN', true); };
     H = { login: go };
     $('#pin').addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
     return;
   }
-  $('#app').innerHTML = `<div class="login"><h1 class="brand">${esc(CONFIG.NAME)}</h1><p class="mute">Counter login</p>
+  $('#app').innerHTML = `<div class="login"><h1 class="brand">${esc(CONFIG.NAME)}</h1><p class="mute">${next === counterView ? 'Counter login' : 'Admin login'}</p>
     <input id="em" class="lgi" type="email" autocomplete="username" placeholder="Email">
     <input id="pw" class="lgi" type="password" autocomplete="current-password" placeholder="Password">
-    <button class="btn teal" data-act="login">Open counter</button></div>`;
+    <button class="btn teal" data-act="login">Open</button></div>`;
   const go = async () => {
     const { error } = await sb.auth.signInWithPassword({ email: $('#em').value.trim().toLowerCase(), password: $('#pw').value });
     if (error) { toast('Wrong email or password', true); return; }
-    beep(); counterView();
+    beep(); next();
   };
   H = { login: go };
   $('#pw').addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
 }
 
+function loginScreen(next) { loginScreen0(next || counterView); }
 async function counterView() {
   document.title = 'Counter · ' + CONFIG.NAME;
   let authed;
@@ -1505,7 +1589,7 @@ async function counterView() {
   else { const { data } = await sb.auth.getSession(); authed = !!(data && data.session); }
   if (!authed) { loginScreen(); return; }
 
-  const C = { tab: 'orders', orders: [], calls: [], ratings: [], pop: [], seen: null, seenC: null, sound: true, auto: ls.get('vfe_autoprint') === true };
+  const C = { tab: 'orders', orders: [], calls: [], ratings: [], pop: [], seen: null, seenC: null, sound: true, auto: ls.get('vfe_autoprint') === true, autobill: ls.get('vfe_autobill') !== false };
   const nextOf = { new: ['cooking', 'Start cooking'], cooking: ['ready', 'Mark ready'], ready: ['served', 'Mark served'] };
   const payChip = o => `<span class="chipst ${o.pay_status}">${o.pay_status === 'paid' ? 'Paid' : o.pay_status === 'claimed' ? 'Says paid (online)' : o.pay_method === 'cash' ? 'Will pay cash' : o.pay_method === 'online' ? 'Paying online' : 'Unpaid'}</span>`;
   const stars = n => '★'.repeat(n) + '☆'.repeat(5 - n);
@@ -1576,7 +1660,7 @@ async function counterView() {
     }
     $('#app').innerHTML = `${demoBar()}<div class="cn-top"><span class="brand">${esc(CONFIG.NAME)}</span><small style="opacity:.65">v${APP_BUILD}</small>
       ${['orders', 'tables', 'today', 'ratings'].map(t => `<button class="tab ${C.tab === t ? 'on' : ''}" data-act="ctab" data-v="${t}">${{ orders: 'Orders', tables: 'Tables & bills', today: 'Today', ratings: 'Ratings' }[t]}</button>`).join('')}
-      <div class="sp"><button class="sbtn" data-act="sound">Sound: ${C.sound ? 'On' : 'Off'}</button><label><input type="checkbox" data-act="auto" ${C.auto ? 'checked' : ''}> Auto-print new orders</label><button class="sbtn" data-act="logout">Log out</button></div></div>
+      <div class="sp"><button class="sbtn" data-act="sound">Sound: ${C.sound ? 'On' : 'Off'}</button><label><input type="checkbox" data-act="auto" ${C.auto ? 'checked' : ''}> Auto-print new orders</label><label><input type="checkbox" data-act="autobill" ${C.autobill ? 'checked' : ''}> Auto-print bill after paid</label><a class="sbtn" href="?admin" style="text-decoration:none">Admin</a><button class="sbtn" data-act="logout">Log out</button></div></div>
       ${C.sound && !audioOK() ? '<div class="demo" style="background:#FDE2E0;color:#8A1C12;cursor:pointer;font-size:15px;padding:10px" data-act="unlock">Sound abhi band hai. Yahan ek baar dabao, tab alert bajega.</div>' : ''}${calls.length ? `<div class="alerts">${calls.map(alertHtml).join('')}</div>` : ''}${body}${popupHtml()}`;
   }
 
@@ -1615,6 +1699,7 @@ async function counterView() {
     ctab: async v => { C.tab = v; if (v === 'ratings') { try { C.ratings = await store.loadRatings(); } catch (e) { console.error(e); } } render(); },
     sound: () => { C.sound = !C.sound; if (C.sound) beep(); render(); },
     auto: (v, el) => { C.auto = el.checked; ls.set('vfe_autoprint', C.auto); },
+    autobill: (v, el) => { C.autobill = el.checked; ls.set('vfe_autobill', C.autobill); },
     unlock: () => { unlockAudio(); beep(); render(); },
     logout: async () => {
       clearInterval(alarmTimer); alarmTimer = null; clearInterval(billTimer); billTimer = null; clearInterval(cleanupTimer); stopSync();
@@ -1627,9 +1712,15 @@ async function counterView() {
     bill: v => printHtml(slipBill(v, C.orders.filter(o => o.table_no === +v && o.pay_status !== 'paid'))),
     paid: async v => {
       const t = +v, u = C.orders.filter(o => o.table_no === t && o.pay_status !== 'paid');
-      await store.patchOrders(u.map(o => o.id), { pay_status: 'paid', pay_method: (u[0] || {}).pay_method || 'cash', paid_at: new Date().toISOString() });
+      const nowIso = new Date().toISOString(), meth = (u[0] || {}).pay_method || 'cash';
+      await store.patchOrders(u.map(o => o.id), { pay_status: 'paid', pay_method: meth, paid_at: nowIso });
       await store.patchCalls(C.calls.filter(c => c.table_no === t && c.kind === 'bill' && !c.done).map(c => c.id), { done: true });
       toast('Table ' + t + ' marked paid'); await sync();
+      if (u.length) {
+        // bill apne-aap nikal aaye (popup + agar chaaho to seedha print)
+        const bl = u.map(o => ({ ...o, pay_status: 'paid', pay_method: meth, paid_at: nowIso }));
+        showBillModal(bl, (bl.find(o => o.phone) || {}).phone || '', C.autobill);
+      }
     },
     notrecv: async v => {
       const t = +v, u = C.orders.filter(o => o.table_no === t && o.pay_status === 'claimed');
@@ -1647,6 +1738,179 @@ async function counterView() {
     }
   };
   render(); sync();
+}
+
+/* ==========================================================
+   ADMIN  (?admin) — menu, rate, photo, UPI, tables, orders sab badlo
+   ========================================================== */
+const ADM = { on: false };
+function imgToData(file, max, q) {
+  return new Promise((res, rej) => {
+    const fr = new FileReader();
+    fr.onerror = rej;
+    fr.onload = () => {
+      const im = new Image();
+      im.onerror = rej;
+      im.onload = () => {
+        const k = Math.min(1, max / Math.max(im.width, im.height));
+        const c = document.createElement('canvas');
+        c.width = Math.round(im.width * k); c.height = Math.round(im.height * k);
+        const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(im, 0, 0, c.width, c.height);
+        res(c.toDataURL('image/jpeg', q));
+      };
+      im.src = fr.result;
+    };
+    fr.readAsDataURL(file);
+  });
+}
+async function adminView() {
+  document.title = 'Admin · ' + CONFIG.NAME;
+  let authed;
+  if (DEMO) authed = ls.get('vfe_auth') === CONFIG.COUNTER_PIN;
+  else { const { data } = await sb.auth.getSession(); authed = !!(data && data.session); }
+  if (!authed) { loginScreen(adminView); return; }
+
+  const A = { tab: 'menu', dirty: false, orders: [],
+    menu: JSON.parse(JSON.stringify(CONFIG.MENU)),
+    set: { name: CONFIG.NAME, upi_id: CONFIG.UPI_ID, upi_name: CONFIG.UPI_NAME, tables: CONFIG.TABLES, logo: CONFIG.LOGO || '' } };
+  A.menu.forEach(c => c.items.forEach(i => { if (i.img === undefined && PHOTOS[i.id]) i.img = PHOTOS[i.id]; }));
+  ADM.on = true;
+  const photoOf = i => i.img !== undefined ? i.img : (PHOTOS[i.id] || '');
+  const nid = () => 'n' + Date.now().toString(36) + Math.floor(Math.random() * 1000).toString(36);
+  const mark = () => { A.dirty = true; const b = document.getElementById('adm-save'); if (b) b.disabled = false; const t = document.getElementById('adm-dirty'); if (t) t.textContent = 'बदलाव सेव नहीं हुए · Unsaved changes'; };
+  const swap = (arr, a, b) => { if (b < 0 || b >= arr.length) return; const t = arr[a]; arr[a] = arr[b]; arr[b] = t; };
+
+  const fld = (label, key, val, cls, type) => `<div class="${cls || 'f'}"><label>${label}</label><input type="${type || 'text'}" ${type === 'number' ? 'inputmode="numeric" min="0"' : ''} data-k="${key}" value="${esc(val == null ? '' : val)}"></div>`;
+
+  function menuTab() {
+    return A.menu.map((c, ci) => `<div class="card"><div class="row">${fld('Category (English)', `c:${ci}:cat`, c.cat)}${fld('श्रेणी (हिंदी)', `c:${ci}:hi`, c.hi)}</div>
+      <div class="row"><button class="mini" data-act="cup" data-v="${ci}">↑</button><button class="mini" data-act="cdn" data-v="${ci}">↓</button><button class="mini red" data-act="cdel" data-v="${ci}">Delete category</button></div>
+      ${c.items.map((i, ii) => { const hasV = i.variants && i.variants.length, ph = photoOf(i); return `<div class="itm">
+        <div class="row">${ph ? `<img class="thumb" src="${ph}" alt="">` : '<div class="thumb"></div>'}
+          <div style="flex:1;min-width:150px"><label style="margin:0">Photo</label><input type="file" accept="image/*" data-pic="${ci}:${ii}" style="font-size:13px">${ph ? `<button class="mini red" data-act="picdel" data-v="${ci}:${ii}" style="margin-top:4px">Photo hatao</button>` : ''}</div></div>
+        <div class="row">${fld('Name (English)', `i:${ci}:${ii}:name`, i.name, 'f2')}${fld('नाम (हिंदी)', `i:${ci}:${ii}:hi`, i.hi, 'f2')}
+          ${hasV ? '' : fld('Price ₹ / रेट', `i:${ci}:${ii}:price`, i.price, 'f', 'number')}</div>
+        <div class="row">${fld('Description', `i:${ci}:${ii}:desc`, i.desc, 'f2')}${fld('विवरण (हिंदी)', `i:${ci}:${ii}:descHi`, i.descHi, 'f2')}</div>
+        ${hasV ? i.variants.map((v, vi) => `<div class="row" style="background:#fff;border:1px dashed var(--line);border-radius:10px;padding:6px">${fld('Size', `v:${ci}:${ii}:${vi}:label`, v.label)}${fld('साइज़ (हिंदी)', `v:${ci}:${ii}:${vi}:hi`, v.hi)}${fld('Price ₹', `v:${ci}:${ii}:${vi}:price`, v.price, 'f', 'number')}<button class="mini red" data-act="vdel" data-v="${ci}:${ii}:${vi}">✕</button></div>`).join('') + `<div class="row"><button class="mini" data-act="vadd" data-v="${ci}:${ii}">+ Size jodo</button><button class="mini" data-act="vnone" data-v="${ci}:${ii}">Sirf ek rate (Half/Full hatao)</button></div>`
+          : `<div class="row"><button class="mini" data-act="vhf" data-v="${ci}:${ii}">Half / Full banao</button></div>`}
+        <div class="row"><label style="width:auto"><input type="checkbox" data-chk="${ci}:${ii}:available" ${i.available === false ? '' : 'checked'}> Available aaj</label>
+          <label style="width:auto"><input type="checkbox" data-chk="${ci}:${ii}:veg" ${i.veg === false ? '' : 'checked'}> Veg</label>
+          <button class="mini" data-act="iup" data-v="${ci}:${ii}">↑</button><button class="mini" data-act="idn" data-v="${ci}:${ii}">↓</button><button class="mini red" data-act="idel" data-v="${ci}:${ii}">Delete item</button></div></div>`; }).join('')}
+      <div class="row"><button class="mini" data-act="iadd" data-v="${ci}">+ Naya item</button></div></div>`).join('')
+      + '<div class="row"><button class="btn line sm" data-act="cadd">+ Nayi category</button></div>';
+  }
+  function setTab() {
+    const o = A.set;
+    return `<div class="card"><div class="row">${fld('Restaurant ka naam', 's:name', o.name, 'f2')}${fld('Tables (1–100)', 's:tables', o.tables, 'f', 'number')}</div>
+      <div class="row">${fld('UPI ID (khali = online band)', 's:upi_id', o.upi_id, 'f2')}${fld('UPI naam', 's:upi_name', o.upi_name, 'f2')}</div>
+      <div class="row">${o.logo ? `<img class="thumb" src="${o.logo}" alt="">` : ''}<div style="flex:1"><label>Logo badlo</label><input type="file" accept="image/*" data-logo="1"></div></div></div>
+      <div class="card"><b>Menu wapas shuru jaisa</b><p class="mute" style="margin:6px 0;font-size:13px">Saare badlav hata kar app ka original menu aur settings wapas aa jayenge.</p><button class="mini red" data-act="reset">Original par wapas jao</button></div>`;
+  }
+  function ordTab() {
+    const stNames = ['new', 'cooking', 'ready', 'served'];
+    return (A.orders.length ? A.orders.slice().sort((a, b) => byTime(b, a)).map(o => `<div class="card"><div class="row"><b>Table ${o.table_no} · #${o.num}</b><span class="mute" style="font-size:13px">${tm(o.created_at)}${o.phone ? ' · ' + esc(o.phone) : ''}</span></div>
+      ${o.items.map((x, xi) => `<div class="row"><span style="flex:1">${esc(x.name)} @${x.price}</span><input type="number" min="0" style="width:80px" data-oq="${o.id}:${xi}" value="${x.qty}"></div>`).join('')}
+      <div class="row"><b>${rupee(o.total)}</b>
+        <select data-os="${o.id}:status">${stNames.map(s2 => `<option ${o.status === s2 ? 'selected' : ''}>${s2}</option>`).join('')}</select>
+        <select data-os="${o.id}:pay_status">${['unpaid', 'claimed', 'paid'].map(s2 => `<option ${o.pay_status === s2 ? 'selected' : ''}>${s2}</option>`).join('')}</select>
+        <select data-os="${o.id}:pay_method">${['', 'cash', 'online'].map(s2 => `<option value="${s2}" ${(o.pay_method || '') === s2 ? 'selected' : ''}>${s2 || 'method?'}</option>`).join('')}</select></div>
+      <div class="row"><button class="mini" data-act="osave" data-v="${o.id}">Save qty</button><button class="mini" data-act="obill" data-v="${o.id}">Bill</button><button class="mini red" data-act="odel" data-v="${o.id}">Delete order</button></div></div>`).join('') : '<p class="mute" style="padding:14px">Aaj koi order nahi.</p>');
+  }
+  function render() {
+    const y = window.scrollY;
+    const tabs = { menu: 'Menu', set: 'Settings', ord: 'Aaj ke orders' };
+    $('#app').innerHTML = `${demoBar()}<div class="adm"><div class="bar"><span class="brand">Admin · ${esc(CONFIG.NAME)}</span>
+      ${Object.keys(tabs).map(k => `<button class="${A.tab === k ? 'on' : ''}" data-act="atab" data-v="${k}">${tabs[k]}</button>`).join('')}
+      <a href="?counter">Counter</a><a href="?qr">QR</a><button data-act="alogout">Log out</button></div>
+      ${A.tab === 'menu' ? menuTab() : A.tab === 'set' ? setTab() : ordTab()}
+      ${A.tab !== 'ord' ? `<div class="savebar"><span id="adm-dirty" class="mute" style="font-size:13px">${A.dirty ? 'बदलाव सेव नहीं हुए · Unsaved changes' : 'सब सेव है · All saved'}</span><button class="btn teal" id="adm-save" data-act="asave" ${A.dirty ? '' : 'disabled'}>Save / सेव करें</button></div>` : ''}</div>`;
+    window.scrollTo(0, y);
+  }
+  async function loadOrders() { try { A.orders = (await store.load()).orders; } catch (e) { console.error(e); } }
+
+  const P = v => v.split(':').map(x => +x);
+  H = {
+    atab: async v => { A.tab = v; if (v === 'ord') await loadOrders(); render(); },
+    alogout: async () => { ADM.on = false; if (DEMO) ls.set('vfe_auth', ''); else await sb.auth.signOut(); adminView(); },
+    cadd: () => { A.menu.push({ cat: 'New category', hi: 'नई श्रेणी', items: [] }); mark(); render(); },
+    cdel: v => { if (confirm('Poori category delete karein?')) { A.menu.splice(+v, 1); mark(); render(); } },
+    cup: v => { swap(A.menu, +v, +v - 1); mark(); render(); }, cdn: v => { swap(A.menu, +v, +v + 1); mark(); render(); },
+    iadd: v => { A.menu[+v].items.push({ id: nid(), name: 'New item', hi: 'नया आइटम', desc: '', descHi: '', price: 100 }); mark(); render(); },
+    idel: v => { const [c, i] = P(v); if (confirm('Ye item delete karein?')) { A.menu[c].items.splice(i, 1); mark(); render(); } },
+    iup: v => { const [c, i] = P(v); swap(A.menu[c].items, i, i - 1); mark(); render(); },
+    idn: v => { const [c, i] = P(v); swap(A.menu[c].items, i, i + 1); mark(); render(); },
+    vhf: v => { const [c, i] = P(v), it = A.menu[c].items[i], p = it.price || 0; it.variants = [{ id: 'h', label: 'Half', hi: 'आधा प्लेट', price: Math.round(p * 0.6) }, { id: 'f', label: 'Full', hi: 'फुल प्लेट', price: p }]; delete it.price; mark(); render(); },
+    vadd: v => { const [c, i] = P(v), it = A.menu[c].items[i]; it.variants.push({ id: 'v' + Date.now().toString(36), label: 'Size', hi: 'साइज़', price: 0 }); mark(); render(); },
+    vdel: v => { const [c, i, k] = P(v), it = A.menu[c].items[i]; it.variants.splice(k, 1); if (!it.variants.length) { delete it.variants; it.price = 0; } mark(); render(); },
+    vnone: v => { const [c, i] = P(v), it = A.menu[c].items[i]; it.price = (it.variants[it.variants.length - 1] || {}).price || 0; delete it.variants; mark(); render(); },
+    picdel: v => { const [c, i] = P(v); A.menu[c].items[i].img = ''; mark(); render(); },
+    asave: async () => {
+      const bad = [];
+      A.menu.forEach(c => { if (!String(c.cat).trim()) bad.push('Category ka naam khali hai'); c.items.forEach(i => {
+        if (!String(i.name).trim()) bad.push('Kisi item ka naam khali hai');
+        const pr = (i.variants && i.variants.length) ? i.variants.map(v => v.price) : [i.price];
+        if (pr.some(x => !(x >= 0) || x === '' || x == null)) bad.push((i.name || 'item') + ': rate galat hai');
+        if (i.variants && i.variants.some(v => !String(v.label).trim())) bad.push((i.name || 'item') + ': size ka naam khali hai');
+      }); });
+      const tb = +A.set.tables;
+      if (!(tb >= 1 && tb <= 100)) bad.push('Tables 1 se 100 ke beech hone chahiye');
+      if (!String(A.set.name).trim()) bad.push('Restaurant ka naam khali hai');
+      if (bad.length) { toast(bad[0], true); return; }
+      const menu = JSON.parse(JSON.stringify(A.menu));
+      menu.forEach(c => c.items.forEach(i => { if (i.img === PHOTOS[i.id]) delete i.img; ['price'].forEach(k => { if (i[k] != null) i[k] = Math.round(+i[k]); }); if (i.variants) i.variants.forEach(v => v.price = Math.round(+v.price)); if (!i.desc) delete i.desc; if (!i.descHi) delete i.descHi; }));
+      const obj = { menu, name: A.set.name.trim(), upi_id: (A.set.upi_id || '').trim(), upi_name: (A.set.upi_name || '').trim() || A.set.name.trim(), tables: tb | 0 };
+      if (A.set.logo && A.set.logo !== (CONFIG.LOGO || '')) obj.logo = A.set.logo; else if (CONFIG.LOGO && CONFIG.LOGO.length < 400000 && A.set.logo) obj.logo = A.set.logo;
+      try { await store.saveSettings(obj); }
+      catch (e) { console.error(e); toast('Save nahi hua. STEP4 SQL chalaya? (Supabase)', true); return; }
+      applySettings(obj); A.dirty = false; toast('Save ho gaya ✓ Ab grahak ko naya menu dikhega'); render();
+    },
+    reset: async () => { if (!confirm('Sab badlav hata dein?')) return; try { await store.resetSettings(); } catch (e) { toast('Nahi hua', true); return; } location.reload(); },
+    osave: async v => {
+      const o = A.orders.find(x => x.id === v); if (!o) return;
+      const items = o.items.filter(x => x.qty > 0);
+      if (!items.length) { toast('Saare item 0 hain. Order delete karna ho to Delete dabao.', true); return; }
+      const total = sum(items, x => x.price * x.qty);
+      await store.patchOrders([v], { items, total }); toast('Order badal gaya ✓'); await loadOrders(); render();
+    },
+    odel: async v => { if (!confirm('Ye order delete karein?')) return; await store.deleteOrders([v]); toast('Delete ho gaya'); await loadOrders(); render(); },
+    obill: v => { const o = A.orders.find(x => x.id === v); if (o) showBillModal([o], o.phone || '', false); }
+  };
+
+  if (!ADM.bound) {
+    ADM.bound = true;
+    document.addEventListener('input', e => {
+      if (!ADM.on) return; const t = e.target;
+      if (t.dataset.k) {
+        const p = t.dataset.k.split(':'), v = t.type === 'number' ? (t.value === '' ? '' : +t.value) : t.value;
+        if (p[0] === 'c') A.menu[+p[1]][p[2]] = v;
+        else if (p[0] === 'i') A.menu[+p[1]].items[+p[2]][p[3]] = v;
+        else if (p[0] === 'v') A.menu[+p[1]].items[+p[2]].variants[+p[3]][p[4]] = v;
+        else if (p[0] === 's') A.set[p[1]] = v;
+        mark();
+      } else if (t.dataset.chk) {
+        const [c, i, k] = t.dataset.chk.split(':'); const it = A.menu[+c].items[+i];
+        if (k === 'available') { if (t.checked) delete it.available; else it.available = false; }
+        else { if (t.checked) delete it.veg; else it.veg = false; }
+        mark();
+      } else if (t.dataset.oq) {
+        const [id, xi] = t.dataset.oq.split(':'), o = A.orders.find(x => x.id === id); if (o) o.items[+xi].qty = Math.max(0, parseInt(t.value, 10) || 0);
+      }
+    });
+    document.addEventListener('change', async e => {
+      if (!ADM.on) return; const t = e.target;
+      try {
+        if (t.dataset.pic && t.files[0]) { const [c, i] = t.dataset.pic.split(':').map(Number); A.menu[c].items[i].img = await imgToData(t.files[0], 520, 0.72); mark(); render(); }
+        else if (t.dataset.logo && t.files[0]) { A.set.logo = await imgToData(t.files[0], 360, 0.85); mark(); render(); }
+        else if (t.dataset.os) {
+          const [id, k] = t.dataset.os.split(':'), patch = { [k]: t.value || null };
+          if (k === 'status' && t.value !== 'new') patch[t.value + '_at'] = new Date().toISOString();
+          if (k === 'pay_status' && t.value === 'paid') patch.paid_at = new Date().toISOString();
+          await store.patchOrders([id], patch); toast('Badal diya ✓'); await loadOrders(); render();
+        }
+      } catch (err) { console.error(err); toast('Nahi hua, dobara try karein', true); }
+    });
+  }
+  render();
 }
 
 /* ==========================================================
@@ -1678,14 +1942,16 @@ function homeView(msg) {
   document.title = CONFIG.NAME;
   $('#app').innerHTML = `${demoBar()}<div class="wrap"><h1 class="brand" style="font-size:30px;color:var(--teal)">${esc(CONFIG.NAME)}</h1>
     ${msg ? `<p>${esc(msg)}</p>` : '<p class="mute">Owner page. Customers seedha apne table ka QR scan karte hain.</p>'}
-    <h3 style="margin-top:20px">Staff</h3><p style="margin:8px 0 16px"><a class="btn teal sm" href="?counter">Open counter</a> <a class="btn line sm" href="?qr">Print table QR codes</a> <a class="btn line sm" href="?orders">Past orders / bill page</a></p>
+    <h3 style="margin-top:20px">Staff</h3><p style="margin:8px 0 16px"><a class="btn teal sm" href="?counter">Open counter</a> <a class="btn line sm" href="?qr">Print table QR codes</a> <a class="btn line sm" href="?admin">Admin panel</a> <a class="btn line sm" href="?orders">Past orders / bill page</a></p>
     <h3>Try the customer screen</h3><div class="hgrid">${Array.from({ length: CONFIG.TABLES }, (_, i) => `<a href="?table=${i + 1}">Table ${i + 1}</a>`).join('')}</div></div>`;
 }
 
-(function () {
+(async function () {
   checkUpdate(); setInterval(checkUpdate, 10 * 60 * 1000);
+  await loadSettings();
   const p = new URLSearchParams(location.search), t = parseInt(p.get('table'), 10);
-  if (p.has('qr')) qrView();
+  if (p.has('admin')) adminView();
+  else if (p.has('qr')) qrView();
   else if (p.has('counter')) counterView();
   else if (p.has('orders') || p.has('track')) customerView(null);
   else if (t >= 1 && t <= CONFIG.TABLES) customerView(t);
