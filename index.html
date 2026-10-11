@@ -2,14 +2,15 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="app-build" content="23">
+<meta name="app-build" content="24">
+<meta name="theme-color" content="#0F3D38">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Vrindavan Food Enterprise</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Hind:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Cormorant+Garamond:wght@500;600;700&family=Tiro+Devanagari+Hindi&family=Hind:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-:root{--teal:#0B4F4A;--teal2:#073B37;--gold:#F5B301;--gold2:#FFE9A8;--bg:#F4F7F5;--ink:#14211F;--mute:#5B6B67;--line:#D9E3DE;--red:#C0392B;--green:#1E8449;--card:#fff}
+:root{--teal:#0F3D38;--teal2:#082521;--gold:#C9A24B;--gold2:#F3E7C4;--bg:#FAF6EC;--ink:#1C1B17;--mute:#6E6857;--line:#E6DCC3;--red:#B03A2E;--green:#2F7D55;--card:#fff}
 *{box-sizing:border-box;margin:0}
 body{font-family:'Hind',system-ui,sans-serif;background:var(--bg);color:var(--ink);font-size:16px;line-height:1.45;-webkit-tap-highlight-color:transparent}
 h1,h2,h3,.brand,.tn,.tbadge{font-family:'Baloo 2','Hind',sans-serif}
@@ -283,6 +284,87 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
 #billmodal .ba button{flex:1 1 90px;padding:11px;border-radius:10px;font-weight:700;font-size:15px;border:2px solid var(--teal);color:var(--teal);background:#fff}
 #billmodal .ba button.p{background:var(--teal);color:#fff}
 @media print{#billmodal{display:none!important}}
+/* ===== LUXE THEME: ivory, deep emerald, champagne gold ===== */
+:root{--gold-d:#8F6B1E;--gold-l:#E9D49A;--gold-g:linear-gradient(135deg,#F0DDA2 0%,#C9A24B 48%,#9C7A2C 100%);--serif:'Cormorant Garamond','Tiro Devanagari Hindi',Georgia,serif;--emerald:linear-gradient(160deg,#0F3D38 0%,#082521 100%)}
+body{background:var(--bg);color:var(--ink)}
+h1,h2,h3,.brand,.tn,.tbadge,.stat b{font-family:var(--serif);font-variant-numeric:lining-nums;font-feature-settings:'lnum' 1}
+#toast{background:#0F3D38;color:#F6E9C4;border:1px solid var(--gold);border-radius:8px;letter-spacing:.02em;box-shadow:0 10px 30px rgba(0,0,0,.3)}
+#toast.err{background:var(--red);color:#fff;border-color:#E6B0A8}
+.btn{border-radius:8px;letter-spacing:.04em}
+.btn.gold{background:var(--gold-g);color:#2B1F05;box-shadow:0 4px 14px rgba(156,122,44,.35)}
+.btn.teal{background:var(--emerald);color:var(--gold-l);border:1px solid var(--gold)}
+.btn.line{border:1px solid var(--gold);color:var(--teal);background:#fff}
+.top{background:var(--emerald);border-bottom:1px solid var(--gold);box-shadow:0 8px 24px rgba(8,37,33,.18);padding:20px 18px}
+.top .brand{font-size:27px;font-weight:600;letter-spacing:.02em;color:#F6E9C4}
+.sub{font-family:var(--serif);font-style:italic;font-size:17px;color:var(--gold-l)}
+.hlogo{border-radius:50%;border:1.5px solid var(--gold);padding:2px;background:#fff;width:52px;height:52px}
+.tbadge{background:transparent;border:1px solid var(--gold);color:var(--gold-l);border-radius:10px;padding:6px 14px}
+.tbadge b{color:#F6E9C4;font-weight:600;font-size:34px}
+.bar{background:rgba(250,246,236,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.tab{font-weight:500;letter-spacing:.02em}
+.tab.on{background:var(--teal);color:var(--gold-l)}
+.callw{background:transparent;border:1px solid var(--gold);color:var(--gold-d)}
+.chip{background:transparent;border:1px solid var(--line);font-weight:500;letter-spacing:.02em}
+.chip.on{background:var(--teal);color:var(--gold-l);border-color:var(--teal)}
+.item,.item2{background:transparent;border-bottom:1px solid var(--line)}
+.nm{font-family:var(--serif);font-size:20px;font-weight:600;letter-spacing:.01em}
+.pr{font-family:var(--serif);font-size:20px;color:var(--gold-d);font-weight:700}
+.pic{border-radius:14px;box-shadow:0 4px 14px rgba(40,30,10,.18);border:1px solid rgba(201,162,75,.5)}
+.add{border:1px solid var(--gold);color:var(--teal);border-radius:8px;letter-spacing:.06em;font-weight:600;background:#fff}
+.step{background:var(--teal);border-radius:8px;border:1px solid var(--gold)}
+.step span{color:var(--gold-l)}
+.cb{background:var(--emerald);border-top:1px solid var(--gold);color:#F6E9C4}
+.sheet{background:var(--bg);border-top:1px solid var(--gold);border-radius:22px 22px 0 0}
+.sh-h h2{font-size:25px;font-weight:600}
+.scrim{background:rgba(6,24,21,.62);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+.home::before{content:"";display:block;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);margin:0 24px 4px}
+.bigbtn{background:var(--emerald);color:var(--gold-l);border:1px solid var(--gold);border-radius:14px;font-weight:600;font-size:31px;letter-spacing:.02em;padding:36px 16px;box-shadow:0 12px 30px rgba(8,37,33,.3),inset 0 0 0 4px #0B2E2A,inset 0 0 0 5px rgba(201,162,75,.5)}
+.bigbtn .bi1{display:flex}
+.midbtn{background:#fff;border:1px solid var(--gold);color:var(--teal);border-radius:12px;font-family:var(--serif);font-size:22px;font-weight:700;letter-spacing:.02em}
+.hw{background:transparent;border:1px solid var(--gold);color:var(--gold-d);border-radius:12px;font-weight:600;letter-spacing:.02em}
+.lt2{font-family:var(--serif);font-size:18px}
+.seg button{border:1px solid var(--line);background:transparent;font-weight:500}
+.seg button.on{background:var(--teal);color:var(--gold-l);border-color:var(--teal)}
+.oc,.pay,.rcard{background:#fff;border:1px solid rgba(201,162,75,.6);border-radius:14px;box-shadow:0 6px 20px rgba(60,45,15,.08)}
+.oc h3,.pay h3,.rcard h3{font-family:var(--serif);font-size:24px;font-weight:700}
+.prog li.done{color:var(--gold-d)}
+.prog li.done::before{background:var(--gold-g)}
+.msg{background:#F6EFD9;border:1px solid var(--gold-l);color:#3F3210;font-family:var(--serif);font-size:20px;font-weight:600}
+.stars button,.stars span{color:var(--gold)}
+.ver{color:#A39A82;letter-spacing:.08em}
+.login{background:#FFFEF9;border:1px solid var(--gold);border-radius:14px;box-shadow:0 20px 50px rgba(8,37,33,.18)}
+.cn-top{background:var(--emerald);border-bottom:1px solid var(--gold)}
+.cn-top .brand{color:#F6E9C4}
+.cn-top .tab.on{background:var(--gold-g);color:#2B1F05}
+.stat,.tcard{border:1px solid var(--line)}
+.stat b{font-size:32px}
+/* popups: customer + counter */
+.notice{background:linear-gradient(180deg,#FFFEF9,#FAF3DF);border:1px solid var(--gold);border-radius:18px;padding:34px 24px 26px;box-shadow:0 30px 80px rgba(0,0,0,.5);overflow:hidden;animation:nIn .6s cubic-bezier(.2,.9,.3,1.1) both}
+.notice::before{content:"";position:absolute;inset:8px;border:1px solid rgba(201,162,75,.55);border-radius:12px;pointer-events:none}
+.notice::after{content:"";position:absolute;top:0;bottom:0;width:55%;left:-80%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.75),transparent);animation:nShine 1.5s .6s ease forwards;pointer-events:none}
+@keyframes nIn{from{opacity:0;transform:translateY(calc(-50% + 26px)) scale(.94)}to{opacity:1;transform:translateY(-50%) scale(1)}}
+@keyframes nShine{to{left:130%}}
+.notice .ni{width:88px;height:88px;margin:0 auto 6px;border-radius:50%;background:var(--emerald);border:1px solid var(--gold);display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:44px;color:var(--gold-l);box-shadow:0 0 0 6px rgba(201,162,75,.18)}
+.notice .ni svg{display:block}
+.notice .nline{font-family:var(--serif);letter-spacing:.14em;font-size:14px;font-weight:700;color:var(--gold-d);margin:8px 0 2px;text-transform:uppercase}
+.notice h2{font-family:var(--serif);font-size:26px;font-weight:600;line-height:1.3;color:var(--teal2);margin:6px 0 20px}
+.ck-c{stroke-dasharray:152;stroke-dashoffset:152;animation:ckd .8s .25s ease forwards}
+.ck-p{stroke-dasharray:42;stroke-dashoffset:42;animation:ckd .5s .9s ease forwards}
+@keyframes ckd{to{stroke-dashoffset:0}}
+#billmodal{background:rgba(6,24,21,.64);backdrop-filter:blur(3px)}
+#billmodal .bx{background:#FFFEF9;border:1px solid var(--gold);border-radius:14px;box-shadow:0 30px 80px rgba(0,0,0,.5);animation:nIn2 .5s cubic-bezier(.2,.9,.3,1.1) both}
+@keyframes nIn2{from{opacity:0;transform:translateY(24px) scale(.95)}to{opacity:1;transform:none}}
+#billmodal .bx .ok{text-align:center;font-family:var(--serif);font-size:21px;font-weight:700;color:var(--gold-d);margin-bottom:8px}
+#billmodal .ba button{border:1px solid var(--gold);border-radius:8px;color:var(--teal)}
+#billmodal .ba button.p{background:var(--emerald);color:var(--gold-l)}
+#splash .mid .w1{font-family:var(--serif);font-weight:600;font-size:40px;letter-spacing:.03em;color:#F6E9C4}
+#splash .mid .w2{font-family:var(--serif);letter-spacing:.5em;font-size:14px;font-weight:600}
+#splash .mid .nm{font-family:var(--serif);font-weight:600;font-size:29px;letter-spacing:.04em;color:#F6E9C4}
+.sbtn{color:#F6E9C4;border-color:rgba(201,162,75,.7)}
+#splash .gl{opacity:.45}
+#splash .mid .w1,#splash .mid .w2,#splash .mid .nm{text-shadow:0 2px 12px rgba(6,24,21,.9),0 0 3px rgba(6,24,21,.9)}
+#splash .mid .lgw{box-shadow:0 0 0 3px #C9A24B,0 0 0 9px rgba(201,162,75,.22),0 18px 50px rgba(0,0,0,.55)}
+@media(prefers-reduced-motion:reduce){.notice,.notice::after,#billmodal .bx,.ck-c,.ck-p{animation-duration:.01s!important;animation-delay:0s!important}}
 </style>
 </head>
 <body>
@@ -732,7 +814,7 @@ const mem = { orders: [], calls: [], ratings: [] };
 const dRead = k => ls.get('vfe_' + k) || mem[k];
 const dWrite = (k, v) => { mem[k] = v; ls.set('vfe_' + k, v); };
 
-const APP_BUILD = '23';
+const APP_BUILD = '24';
 // naya version GitHub par aaya ho to khuli screen par laal patti dikhao
 async function checkUpdate() {
   try {
@@ -1018,7 +1100,7 @@ function billDoc(list, phone) {
   }[b.state];
   const row = (a, c) => `<div style="display:flex;justify-content:space-between;gap:10px;margin:3px 0"><span>${a}</span><span>${c}</span></div>`;
   return `<div style="text-align:center">${CONFIG.LOGO ? `<img src="${CONFIG.LOGO}" style="width:72px;height:72px;object-fit:contain">` : ''}
-    <div style="font-size:20px;font-weight:700">${esc(CONFIG.NAME)}</div><div style="font-size:15px">Bill / बिल</div></div>
+    <div style="font-size:23px;font-weight:700;font-family:'Cormorant Garamond','Tiro Devanagari Hindi',serif;letter-spacing:.02em">${esc(CONFIG.NAME)}</div><div style="font-size:15px;letter-spacing:.2em;color:#8F6B1E">Bill / बिल</div></div>
     <div style="border-top:1px dashed #999;margin:10px 0"></div>
     <div style="font-size:13px;color:#444">
       ${row('Table / टेबल', esc(b.tables))}${row('Mobile / मोबाइल', maskPhone(phone))}${row('Orders / ऑर्डर', esc(b.nums))}
@@ -1067,7 +1149,7 @@ function upiQrImg(amt, t) {
 function showBillModal(list, phone, autoPrint) {
   const old = document.getElementById('billmodal'); if (old) old.remove();
   const m = document.createElement('div'); m.id = 'billmodal';
-  m.innerHTML = `<div class="bx"><div style="text-align:center;font-weight:700;color:#1E8449;margin-bottom:8px">✓ भुगतान दर्ज हुआ · Payment recorded</div>${billDoc(list, phone)}
+  m.innerHTML = `<div class="bx"><div class="ok">✓ भुगतान दर्ज हुआ · Payment recorded</div>${billDoc(list, phone)}
     <div class="ba"><button class="p" id="bm-print">🖨 Print</button><button id="bm-pdf">⬇ PDF</button><button id="bm-x">Close</button></div></div>`;
   document.body.appendChild(m);
   const close = () => m.remove();
@@ -1199,8 +1281,8 @@ function customerView(tableNo) {
   const upiLink = (amt, t) => `upi://pay?pa=${encodeURIComponent(CONFIG.UPI_ID)}&pn=${encodeURIComponent(CONFIG.UPI_NAME)}&am=${amt}&cu=INR&tn=${encodeURIComponent('Table ' + (t || ''))}`;
 
   const homeHtml = () => `<div class="home">
-    <button class="bigbtn" data-act="go" data-v="menu"><span class="bi1">🛒</span><span>${L('Place a new order')}</span></button>
-    <button class="midbtn" data-act="go" data-v="orders">📋 ${L('View past orders / bill')}</button>
+    <button class="bigbtn" data-act="go" data-v="menu"><span class="bi1"><svg viewBox="0 0 32 32" width="34" height="34" fill="none" stroke="#E9D49A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 11h18l-1.6 15H8.6L7 11z"/><path d="M11.5 14V9.5a4.5 4.5 0 0 1 9 0V14"/></svg></span><span>${L('Place a new order')}</span></button>
+    <button class="midbtn" data-act="go" data-v="orders">${L('View past orders / bill')}</button>
     <button class="hw wbtn" data-act="waiter" data-i="🔔">🔔 ${L('Call waiter')}</button>
     <div class="langsel"><div class="lt2">🌐 भाषा / Language</div><div class="seg">
       <button data-act="setlang" data-v="hi" id="sg-hi">हिंदी</button>
@@ -1370,7 +1452,12 @@ function customerView(tableNo) {
   function showNotice() {
     const n = S.notices[0], el = $('#notice');
     if (!n) { el.innerHTML = ''; return; }
-    el.innerHTML = `<div class="scrim" style="z-index:60"></div><div class="notice" role="alertdialog"><div class="ni">${n.icon}</div><h2>${bi(n.en, n.hi)}</h2><button class="btn gold" data-act="closenotice">OK</button></div>`;
+    const SV = {
+      '✅': '<svg viewBox="0 0 52 52" width="88" height="88" aria-hidden="true"><circle class="ck-c" cx="26" cy="26" r="24" fill="#0F3D38" stroke="#C9A24B" stroke-width="1.5"/><path class="ck-p" d="M15 27l8 8 15-17" fill="none" stroke="#E9D49A" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+      '🍽️': '<svg viewBox="0 0 52 52" width="52" height="52" aria-hidden="true"><g fill="none" stroke="#E9D49A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 35h36"/><path d="M11 35a15 15 0 0 1 30 0"/><path d="M26 20v-4M23 16h6"/><path d="M6 40h40"/></g></svg>'
+    };
+    const ic = SV[n.icon] || esc(n.icon), isOk = n.icon === '✅';
+    el.innerHTML = `<div class="scrim" style="z-index:60"></div><div class="notice" role="alertdialog"><div class="ni" ${isOk ? 'style="background:none;border:0;box-shadow:none"' : ''}>${ic}</div><div class="nline">${esc(CONFIG.NAME)}</div><h2>${bi(n.en, n.hi)}</h2><button class="btn gold" data-act="closenotice">OK</button></div>`;
     if (n.sound === 'paid') paidChime(); else readyChime();
     try { navigator.vibrate && navigator.vibrate([200, 100, 200]); } catch (e) {}
   }
@@ -1630,7 +1717,7 @@ async function counterView() {
     const c = C.calls.find(x => x.id === C.pop[0]);
     if (!c) return '';
     const amt = ((c.note || '').match(/Rs (\d+)/) || [])[1], a = amt ? ' (₹' + amt + ')' : '';
-    return `<div class="scrim" style="z-index:60"></div><div class="notice" role="alertdialog"><div class="ni">💰</div>
+    return `<div class="scrim" style="z-index:60"></div><div class="notice" role="alertdialog"><div class="ni">₹</div>
       <h2>टेबल ${c.table_no} · Table ${c.table_no}</h2>
       <p style="margin:0 0 6px;font-weight:700">ग्राहक कहता है भुगतान कर दिया${a}<br><span style="font-weight:600;color:#5B6B67">Customer says payment is done${a}</span></p>
       <p style="margin:0 0 14px;color:#5B6B67;font-size:15px">अपना UPI जाँचें, फिर "Mark paid" दबाएँ · Check your UPI, then press Mark paid</p>
