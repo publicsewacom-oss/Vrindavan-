@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="app-build" content="25">
+<meta name="app-build" content="26">
 <meta name="theme-color" content="#0F3D38">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Vrindavan Food Enterprise</title>
@@ -812,11 +812,13 @@ const ls = {
    ========================================================== */
 const DEMO = !(CONFIG.SUPABASE_URL && CONFIG.SUPABASE_KEY && window.supabase);
 const sb = DEMO ? null : window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
+let RECOVERY = /type=recovery/.test(location.hash);   // email ke "password badlo" link se aaye to
+if (!DEMO) { try { sb.auth.onAuthStateChange(ev => { if (ev === 'PASSWORD_RECOVERY') RECOVERY = true; }); } catch (e) {} }
 const mem = { orders: [], calls: [], ratings: [] };
 const dRead = k => ls.get('vfe_' + k) || mem[k];
 const dWrite = (k, v) => { mem[k] = v; ls.set('vfe_' + k, v); };
 
-const APP_BUILD = '25';
+const APP_BUILD = '26';
 // naya version GitHub par aaya ho to khuli screen par laal patti dikhao
 async function checkUpdate() {
   try {
@@ -1709,13 +1711,9 @@ function forgotScreen(next) {
   const draw = () => {
     $('#app').innerHTML = `<div class="login"><h1 class="brand">${esc(CONFIG.NAME)}</h1><p class="mute">पासवर्ड बदलें · Reset password</p>
       <input id="fe" class="lgi" type="email" autocomplete="username" placeholder="Email (Gmail)" value="${esc(st.email)}">
-      ${st.sent ? `<p class="mute" style="font-size:14px;margin:4px 0 8px">आपके Email पर कोड भेजा गया है। Inbox, Spam और Promotions देखें। · A code was sent to your email.</p>
-        <input id="fc" class="lgi" inputmode="numeric" autocomplete="one-time-code" placeholder="Email वाला कोड · Code">
-        <input id="fp" class="lgi" type="password" autocomplete="new-password" placeholder="नया पासवर्ड (कम से कम 8) · New password">
-        <input id="fp2" class="lgi" type="password" autocomplete="new-password" placeholder="फिर से वही पासवर्ड · Confirm password">
-        <button class="btn teal" data-act="fset">नया पासवर्ड सेव करें · Save</button>
-        <button class="lnk" data-act="fsend" style="margin-top:12px">दोबारा कोड भेजें · Resend code</button>`
-        : '<button class="btn teal" data-act="fsend">कोड भेजें · Send code</button>'}
+      ${st.sent ? `<p class="mute" style="font-size:15px;margin:6px 0 10px">आपके Email पर "Reset your password" मेल भेजा गया है। Inbox, Spam और Promotions देखें और उसमें <b>Reset password</b> लिंक दबाएँ। · We sent you an email. Tap the link in it.</p>
+        <button class="btn line" data-act="fsend">दोबारा भेजें · Send again</button>`
+        : '<button class="btn teal" data-act="fsend">मेल भेजें · Send reset email</button>'}
       <div><button class="lnk" data-act="fback" style="margin-top:12px">← Login</button></div></div>`;
   };
   H = {
@@ -1723,24 +1721,33 @@ function forgotScreen(next) {
       const email = ($('#fe').value || '').trim().toLowerCase();
       if (!/^\S+@\S+\.\S+$/.test(email)) { toast('सही Email लिखें · Enter a valid email', true); return; }
       st.email = email;
-      const { error } = await sb.auth.resetPasswordForEmail(email);
-      if (error) { toast(error.status === 429 ? 'थोड़ी देर बाद फिर कोशिश करें · Please wait a little' : 'कोड नहीं भेज पाए · Could not send: ' + error.message, true); return; }
-      st.sent = true; draw(); toast('कोड भेज दिया ✓');
-    },
-    fset: async () => {
-      const code = ($('#fc').value || '').replace(/\s/g, ''), p1 = $('#fp').value, p2 = $('#fp2').value;
-      if (!code) { toast('Email वाला कोड लिखें · Enter the code', true); return; }
-      if (p1.length < 8) { toast('पासवर्ड कम से कम 8 अक्षर का हो · Min 8 characters', true); return; }
-      if (p1 !== p2) { toast('दोनों पासवर्ड एक जैसे नहीं हैं · Passwords do not match', true); return; }
-      const v = await sb.auth.verifyOtp({ email: st.email, token: code, type: 'recovery' });
-      if (v.error) { toast('कोड गलत या पुराना है · Wrong or expired code', true); return; }
-      const u = await sb.auth.updateUser({ password: p1 });
-      if (u.error) { toast('पासवर्ड नहीं बदला · ' + u.error.message, true); return; }
-      toast('पासवर्ड बदल गया ✓ · Password changed'); next();
+      const back = location.origin + location.pathname + (next === adminView ? '?admin' : '?counter');
+      const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: back });
+      if (error) { toast(error.status === 429 ? 'थोड़ी देर बाद फिर कोशिश करें · Please wait a little' : 'मेल नहीं भेज पाए · Could not send: ' + error.message, true); return; }
+      st.sent = true; draw(); toast('मेल भेज दिया ✓');
     },
     fback: () => loginScreen0(next)
   };
   draw();
+}
+// email ke link se wapas aane par: naya password banane ki screen
+function recoveryScreen(next) {
+  $('#app').innerHTML = `<div class="login"><h1 class="brand">${esc(CONFIG.NAME)}</h1><p class="mute">नया पासवर्ड बनाएँ · Set new password</p>
+    <input id="rp" class="lgi" type="password" autocomplete="new-password" placeholder="नया पासवर्ड (कम से कम 8) · New password">
+    <input id="rp2" class="lgi" type="password" autocomplete="new-password" placeholder="फिर से वही पासवर्ड · Confirm password">
+    <button class="btn teal" data-act="rset">सेव करें · Save</button></div>`;
+  H = {
+    rset: async () => {
+      const p1 = $('#rp').value, p2 = $('#rp2').value;
+      if (p1.length < 8) { toast('पासवर्ड कम से कम 8 अक्षर का हो · Min 8 characters', true); return; }
+      if (p1 !== p2) { toast('दोनों पासवर्ड एक जैसे नहीं हैं · Passwords do not match', true); return; }
+      const { error } = await sb.auth.updateUser({ password: p1 });
+      if (error) { toast('पासवर्ड नहीं बदला · ' + error.message, true); return; }
+      RECOVERY = false;
+      try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+      toast('पासवर्ड बदल गया ✓ · Password changed'); next();
+    }
+  };
 }
 function loginScreen0(next) {
   if (DEMO) {
@@ -1769,6 +1776,7 @@ function loginScreen0(next) {
 function loginScreen(next) { loginScreen0(next || counterView); }
 async function counterView() {
   document.title = 'Counter · ' + CONFIG.NAME;
+  if (RECOVERY && !DEMO) { recoveryScreen(counterView); return; }
   let authed;
   if (DEMO) authed = ls.get('vfe_auth') === CONFIG.COUNTER_PIN;
   else { const { data } = await sb.auth.getSession(); authed = !!(data && data.session); }
@@ -1976,6 +1984,7 @@ function imgToData(file, max, q) {
 }
 async function adminView() {
   document.title = 'Admin · ' + CONFIG.NAME;
+  if (RECOVERY && !DEMO) { recoveryScreen(adminView); return; }
   let authed;
   if (DEMO) authed = ls.get('vfe_auth') === CONFIG.COUNTER_PIN;
   else { const { data } = await sb.auth.getSession(); authed = !!(data && data.session); }
