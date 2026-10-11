@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="app-build" content="27">
+<meta name="app-build" content="28">
 <meta name="theme-color" content="#0F3D38">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Vrindavan Food Enterprise</title>
@@ -383,6 +383,14 @@ h1,h2,h3,.brand,.tn,.tbadge,.stat b{font-family:var(--serif);font-variant-numeri
 button.warn{outline:2px solid #C98A00;outline-offset:1px}
 .tcard .mchips{margin-top:4px}
 .rawtxt,.alert>div .rawtxt{display:block;font-size:10px;font-weight:500;opacity:.8;margin-top:3px}
+
+/* v28 counter bhasha chunne ka button */
+.clang{display:inline-flex;border:1.5px solid #C9A24B;border-radius:999px;overflow:hidden;vertical-align:middle}
+.clang button{background:transparent;color:inherit;padding:4px 12px;font-size:13px;font-weight:700;border:0;cursor:pointer;line-height:1.4}
+.clang button.on{background:#C9A24B;color:#0F3D38}
+.cn-top .clang{color:#F6E9C4}
+.login .clang{color:#0F3D38;margin:0 auto 4px}
+.login input::placeholder{letter-spacing:0}
 </style>
 </head>
 <body>
@@ -806,7 +814,7 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const rupee = n => '₹' + Number(n).toLocaleString('en-IN');
 const uid = () => (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(16).slice(2);
 const tm = iso => new Date(iso).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' });
-const ago = iso => { const m = Math.max(0, Math.round((Date.now() - new Date(iso)) / 60000)); return m < 1 ? 'just now' : m + ' min ago'; };
+const ago = iso => { const m = Math.max(0, Math.round((Date.now() - new Date(iso)) / 60000)); return m < 1 ? ct('just now', 'अभी-अभी') : ct(m + ' min ago', m + ' मिनट पहले'); };
 const sameDay = iso => new Date(iso).toDateString() === new Date().toDateString();
 const sum = (arr, f) => arr.reduce((a, x) => a + f(x), 0);
 const byTime = (a, b) => new Date(a.created_at) - new Date(b.created_at);
@@ -834,7 +842,7 @@ const mem = { orders: [], calls: [], ratings: [] };
 const dRead = k => ls.get('vfe_' + k) || mem[k];
 const dWrite = (k, v) => { mem[k] = v; ls.set('vfe_' + k, v); };
 
-const APP_BUILD = '27';
+const APP_BUILD = '28';
 // naya version GitHub par aaya ho to khuli screen par laal patti dikhao
 async function checkUpdate() {
   try {
@@ -843,7 +851,7 @@ async function checkUpdate() {
     if (m && +m[1] > +APP_BUILD && !document.querySelector('#upd')) {
       const d = document.createElement('div');
       d.id = 'upd';
-      d.textContent = 'नया वर्शन आ गया है · New version available. अपडेट के लिए यहाँ दबाएँ / Tap to update';
+      d.textContent = /[?&]counter\b/.test(location.search) ? updText() : 'नया वर्शन आ गया है · New version available. अपडेट के लिए यहाँ दबाएँ / Tap to update';
       d.onclick = () => { const q = new URLSearchParams(location.search); q.set('nb', Date.now()); location.replace(location.pathname + '?' + q.toString()); };
       document.body.appendChild(d);
     }
@@ -1110,6 +1118,18 @@ function payerName(p) {
   if (/@/.test(n) || n.length < 2) return '';
   return n;
 }
+/* v28: counter "Done" dabate hi us table ke grahak ko turant khabar (Supabase Realtime Broadcast; na chale to grahak ka tez polling kaam kar leta hai) */
+store.pingWaiter = function (tableNo) {
+  if (DEMO || !sb) return;
+  try {
+    const ch = sb.channel('vfe-waiter-' + tableNo);
+    ch.subscribe(st => {
+      if (st === 'SUBSCRIBED') {
+        Promise.resolve(ch.send({ type: 'broadcast', event: 'done', payload: { t: tableNo } })).catch(() => {}).finally(() => setTimeout(() => { try { sb.removeChannel(ch); } catch (e) {} }, 1500));
+      }
+    });
+  } catch (e) { /* koi baat nahi: grahak ka polling pakad lega */ }
+};
 store.setName = async function (phone, name) {
   if (DEMO) { dWrite('orders', dRead('orders').map(o => (o.phone === phone && o.pay_status !== 'paid') ? { ...o, cname: name } : o)); return; }
   const { error } = await sb.rpc('set_name', { p_phone: phone, p_name: name });
@@ -1175,10 +1195,22 @@ let H = {};
 document.addEventListener('click', e => {
   const t = e.target.closest('[data-act]');
   if (!t || !H[t.dataset.act]) return;
-  Promise.resolve(H[t.dataset.act](t.dataset.v, t)).catch(err => { console.error(err); toast('Something went wrong. Please try again.', true); });
+  Promise.resolve(H[t.dataset.act](t.dataset.v, t)).catch(err => { console.error(err); toast(IN_COUNTER ? ct('Something went wrong. Please try again.', 'कुछ गड़बड़ हो गई। कृपया फिर कोशिश करें।') : 'Something went wrong. Please try again.', true); });
 });
 
 const demoBar = () => DEMO ? '<div class="demo">Demo mode: data sirf isi browser mein save ho raha hai. Live karne ke liye SETUP.md dekho.</div>' : '';
+
+/* ---------- v28: COUNTER ki bhasha (Hindi / English) ---------- */
+const CL = { v: ls.get('vfe_clang') === 'en' ? 'en' : 'hi' };
+let IN_COUNTER = false;
+const ct = (en, hi) => CL.v === 'hi' ? hi : en;
+const clangBar = () => `<div class="clang" role="group" aria-label="Language"><button data-act="clang" data-v="hi" class="${CL.v === 'hi' ? 'on' : ''}">हिंदी</button><button data-act="clang" data-v="en" class="${CL.v === 'en' ? 'on' : ''}">English</button></div>`;
+function setCLang(v) {
+  CL.v = v === 'en' ? 'en' : 'hi'; ls.set('vfe_clang', CL.v);
+  const u = document.getElementById('upd'); if (u && IN_COUNTER) u.textContent = updText();
+}
+const updText = () => ct('New version available. Tap here to update', 'नया वर्शन आ गया है। अपडेट के लिए यहाँ दबाएँ');
+const demoBarC = () => DEMO ? `<div class="demo">${ct('Demo mode: data is saved only in this browser. See SETUP.md to go live.', 'डेमो मोड: डेटा सिर्फ़ इसी ब्राउज़र में सेव हो रहा है। लाइव करने के लिए SETUP.md देखें।')}</div>` : '';
 
 /* ==========================================================
    Printing
@@ -1292,8 +1324,8 @@ function upiQrImg(amt, t) {
 function showBillModal(list, phone, autoPrint) {
   const old = document.getElementById('billmodal'); if (old) old.remove();
   const m = document.createElement('div'); m.id = 'billmodal';
-  m.innerHTML = `<div class="bx"><div class="ok">✓ भुगतान दर्ज हुआ · Payment recorded</div>${billDoc(list, phone)}
-    <div class="ba"><button class="p" id="bm-print">🖨 Print</button><button id="bm-pdf">⬇ PDF</button><button id="bm-x">Close</button></div></div>`;
+  m.innerHTML = `<div class="bx"><div class="ok">${ct('✓ Payment recorded', '✓ भुगतान दर्ज हुआ')}</div>${billDoc(list, phone)}
+    <div class="ba"><button class="p" id="bm-print">🖨 ${ct('Print', 'प्रिंट')}</button><button id="bm-pdf">⬇ PDF</button><button id="bm-x">${ct('Close', 'बंद करें')}</button></div></div>`;
   document.body.appendChild(m);
   const close = () => m.remove();
   m.querySelector('#bm-x').onclick = close;
@@ -1396,6 +1428,7 @@ function showSplash() {
   d.addEventListener('click', bye);
 }
 function customerView(tableNo) {
+  IN_COUNTER = false;
   const only = !tableNo;   // ?orders wala alag page (bina table ke)
   document.title = CONFIG.NAME + (only ? '' : ' · Table ' + tableNo);
   const items = {}, base = {};
@@ -1602,12 +1635,13 @@ function customerView(tableNo) {
     if (!n) { el.innerHTML = ''; return; }
     const SV = {
       '✅': '<svg viewBox="0 0 52 52" width="88" height="88" aria-hidden="true"><circle class="ck-c" cx="26" cy="26" r="24" fill="#0F3D38" stroke="#C9A24B" stroke-width="1.5"/><path class="ck-p" d="M15 27l8 8 15-17" fill="none" stroke="#E9D49A" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+      '🛎️': '<svg viewBox="0 0 52 52" width="52" height="52" aria-hidden="true"><g fill="none" stroke="#E9D49A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 36a14 14 0 0 1 28 0z"/><path d="M26 16v4M22 16h8"/><path d="M8 40h36"/></g></svg>',
       '🍽️': '<svg viewBox="0 0 52 52" width="52" height="52" aria-hidden="true"><g fill="none" stroke="#E9D49A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 35h36"/><path d="M11 35a15 15 0 0 1 30 0"/><path d="M26 20v-4M23 16h6"/><path d="M6 40h40"/></g></svg>'
     };
     const ic = SV[n.icon] || esc(n.icon), isOk = n.icon === '✅';
     el.innerHTML = `<div class="scrim" style="z-index:60"></div><div class="notice" role="alertdialog"><div class="ni" ${isOk ? 'style="background:none;border:0;box-shadow:none"' : ''}>${ic}</div><div class="nline">${esc(CONFIG.NAME)}</div><h2>${bi(n.en, n.hi)}</h2><button class="btn gold" data-act="closenotice">OK</button></div>`;
-    if (n.sound === 'paid') paidChime(); else readyChime();
-    try { navigator.vibrate && navigator.vibrate([200, 100, 200]); } catch (e) {}
+    try { if (n.sound === 'paid') paidChime(); else if (n.sound === 'ping') softPing(); else readyChime(); } catch (e) { /* silent phone: popup phir bhi dikhega */ }
+    try { if (n.sound !== 'ping') navigator.vibrate && navigator.vibrate([200, 100, 200]); } catch (e) {}
   }
   function pushNotice(icon, en, hi, sound) { S.notices.push({ icon, en, hi, sound }); if (S.notices.length === 1) showNotice(); }
 
@@ -1652,13 +1686,41 @@ function customerView(tableNo) {
     if (sc === 'orders' || sc === 'pay' || sc === 'bill') { S.sig = ''; renderOrders(true); if (S.phone) refreshOrders(true); }
   };
 
+  /* ---------- v28: "Done" dabte hi grahak ko "waiter niyukt" popup ---------- */
+  let wFast = null, wBusy = false;
+  let wChan = null;
+  const fastWaiter = on => {
+    if (on && !wFast) {
+      wFast = setInterval(() => checkWaiter(), 3000);
+      // jab tak call pending hai tabhi Realtime se judte hain (connection bachane ke liye)
+      if (!DEMO && !wChan) { try { wChan = sb.channel('vfe-waiter-' + tableNo).on('broadcast', { event: 'done' }, () => checkWaiter()).subscribe(); } catch (e) { wChan = null; } }
+    } else if (!on && wFast) {
+      clearInterval(wFast); wFast = null;
+      if (wChan) { try { sb.removeChannel(wChan); } catch (e) {} wChan = null; }
+    }
+  };
+  async function checkWaiter() {
+    if (only || wBusy) return;
+    wBusy = true;
+    try {
+      let p;
+      try { p = await store.waiterPending(tableNo); } catch (e) { return; /* internet na ho to purani sthiti rehne do */ }
+      S.waiting = p; updateWaiter(); fastWaiter(p);
+      const flag = ls.get('vfe_wflag');
+      if (p) { if (!flag || flag.table !== tableNo) ls.set('vfe_wflag', { t: Date.now(), table: tableNo }); }
+      else if (flag && flag.table === tableNo) {
+        ls.set('vfe_wflag', null);
+        if (Date.now() - flag.t < 3 * 36e5) pushNotice('🛎️', 'Waiter has been assigned. Please wait.', 'वेटर नियुक्त कर दिया गया है। कृपया प्रतीक्षा करें।', 'ping');
+      }
+    } finally { wBusy = false; }
+  }
   const sync = startSync(async () => {
     await refreshOrders(false);
-    if (!only) {
-      try { S.waiting = await store.waiterPending(tableNo); } catch (e) { /* internet na ho to purani sthiti rehne do */ }
-      updateWaiter();
-    }
+    await checkWaiter();
   }, { every: 5000 });
+  if (!only) {
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) checkWaiter(); });
+  }
 
   const payDo = async action => {
     try { await store.payAction(S.phone, action); }
@@ -1698,7 +1760,7 @@ function customerView(tableNo) {
       S.sending = false; refreshCart(); showScreen();
     },
     waiter: async () => {
-      try { await store.callWaiter(tableNo); S.waiting = true; updateWaiter(); toast(tt('Waiter has been called', 'वेटर को बुला लिया गया है')); }
+      try { await store.callWaiter(tableNo); S.waiting = true; updateWaiter(); fastWaiter(true); ls.set('vfe_wflag', { t: Date.now(), table: tableNo }); toast(tt('Waiter has been called', 'वेटर को बुला लिया गया है')); }
       catch (e) { console.error(e); toast(tt('Could not call the waiter. Please try again.', 'वेटर को बुला नहीं पाए। कृपया फिर कोशिश करें।'), true); }
     },
     seeorders: async () => {
@@ -1871,24 +1933,26 @@ const waiterBeep = () => {
 
 let cleanupTimer = null;
 function forgotScreen(next) {
-  const st = { email: (document.getElementById('em') || {}).value || '', sent: false };
+  IN_COUNTER = true;
+  const st = { email: '', sent: false };
   const draw = () => {
-    $('#app').innerHTML = `<div class="login"><h1 class="brand">${esc(CONFIG.NAME)}</h1><p class="mute">पासवर्ड बदलें · Reset password</p>
-      <input id="fe" class="lgi" type="email" autocomplete="username" placeholder="Email (Gmail)" value="${esc(st.email)}">
-      ${st.sent ? `<p class="mute" style="font-size:15px;margin:6px 0 10px">आपके Email पर "Reset your password" मेल भेजा गया है। Inbox, Spam और Promotions देखें और उसमें <b>Reset password</b> लिंक दबाएँ। · We sent you an email. Tap the link in it.</p>
-        <button class="btn line" data-act="fsend">दोबारा भेजें · Send again</button>`
-        : '<button class="btn teal" data-act="fsend">मेल भेजें · Send reset email</button>'}
-      <div><button class="lnk" data-act="fback" style="margin-top:12px">← Login</button></div></div>`;
+    $('#app').innerHTML = `${demoBarC()}<div class="login">${clangBar()}<h1 class="brand">${esc(CONFIG.NAME)}</h1><p class="mute">${ct('Reset password', 'पासवर्ड बदलें')}</p>
+      <input id="fe" class="lgi" type="email" autocomplete="username" placeholder="${ct('Email (Gmail)', 'ईमेल (Gmail)')}" value="${esc(st.email)}">
+      ${st.sent ? `<p class="mute" style="font-size:15px;margin:6px 0 10px">${ct('We sent a "Reset your password" email. Check Inbox, Spam and Promotions and tap the <b>Reset password</b> link in it.', 'आपके ईमेल पर "Reset your password" मेल भेजा गया है। Inbox, Spam और Promotions देखें और उसमें <b>Reset password</b> लिंक दबाएँ।')}</p>
+        <button class="btn line" data-act="fsend">${ct('Send again', 'दोबारा भेजें')}</button>`
+        : `<button class="btn teal" data-act="fsend">${ct('Send reset email', 'मेल भेजें')}</button>`}
+      <div><button class="lnk" data-act="fback" style="margin-top:12px">← ${ct('Login', 'लॉगिन')}</button></div></div>`;
   };
   H = {
+    clang: v => { st.email = ($('#fe') || {}).value || st.email; setCLang(v); draw(); },
     fsend: async () => {
       const email = ($('#fe').value || '').trim().toLowerCase();
-      if (!/^\S+@\S+\.\S+$/.test(email)) { toast('सही Email लिखें · Enter a valid email', true); return; }
+      if (!/^\S+@\S+\.\S+$/.test(email)) { toast(ct('Enter a valid email', 'सही ईमेल लिखें'), true); return; }
       st.email = email;
       const back = location.origin + location.pathname + (next === adminView ? '?admin' : '?counter');
       const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: back });
-      if (error) { toast(error.status === 429 ? 'थोड़ी देर बाद फिर कोशिश करें · Please wait a little' : 'मेल नहीं भेज पाए · Could not send: ' + error.message, true); return; }
-      st.sent = true; draw(); toast('मेल भेज दिया ✓');
+      if (error) { toast(error.status === 429 ? ct('Please wait a little and try again', 'थोड़ी देर बाद फिर कोशिश करें') : ct('Could not send: ', 'मेल नहीं भेज पाए: ') + error.message, true); return; }
+      st.sent = true; draw(); toast(ct('Email sent ✓', 'मेल भेज दिया ✓'));
     },
     fback: () => loginScreen0(next)
   };
@@ -1896,83 +1960,94 @@ function forgotScreen(next) {
 }
 // email ke link se wapas aane par: naya password banane ki screen
 function recoveryScreen(next) {
-  $('#app').innerHTML = `<div class="login"><h1 class="brand">${esc(CONFIG.NAME)}</h1><p class="mute">नया पासवर्ड बनाएँ · Set new password</p>
-    <input id="rp" class="lgi" type="password" autocomplete="new-password" placeholder="नया पासवर्ड (कम से कम 8) · New password">
-    <input id="rp2" class="lgi" type="password" autocomplete="new-password" placeholder="फिर से वही पासवर्ड · Confirm password">
-    <button class="btn teal" data-act="rset">सेव करें · Save</button></div>`;
+  IN_COUNTER = true;
+  const draw = (k = {}) => {
+    $('#app').innerHTML = `${demoBarC()}<div class="login">${clangBar()}<h1 class="brand">${esc(CONFIG.NAME)}</h1><p class="mute">${ct('Set new password', 'नया पासवर्ड बनाएँ')}</p>
+      <input id="rp" class="lgi" type="password" autocomplete="new-password" placeholder="${ct('New password (at least 8)', 'नया पासवर्ड (कम से कम 8)')}" value="${esc(k.a || '')}">
+      <input id="rp2" class="lgi" type="password" autocomplete="new-password" placeholder="${ct('Confirm password', 'फिर से वही पासवर्ड')}" value="${esc(k.b || '')}">
+      <button class="btn teal" data-act="rset">${ct('Save', 'सेव करें')}</button></div>`;
+  };
+  draw();
   H = {
+    clang: v => { const k = { a: ($('#rp') || {}).value, b: ($('#rp2') || {}).value }; setCLang(v); draw(k); },
     rset: async () => {
       const p1 = $('#rp').value, p2 = $('#rp2').value;
-      if (p1.length < 8) { toast('पासवर्ड कम से कम 8 अक्षर का हो · Min 8 characters', true); return; }
-      if (p1 !== p2) { toast('दोनों पासवर्ड एक जैसे नहीं हैं · Passwords do not match', true); return; }
+      if (p1.length < 8) { toast(ct('Password must be at least 8 characters', 'पासवर्ड कम से कम 8 अक्षर का हो'), true); return; }
+      if (p1 !== p2) { toast(ct('Passwords do not match', 'दोनों पासवर्ड एक जैसे नहीं हैं'), true); return; }
       const { error } = await sb.auth.updateUser({ password: p1 });
-      if (error) { toast('पासवर्ड नहीं बदला · ' + error.message, true); return; }
+      if (error) { toast(ct('Password not changed: ', 'पासवर्ड नहीं बदला: ') + error.message, true); return; }
       RECOVERY = false;
       try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
-      toast('पासवर्ड बदल गया ✓ · Password changed'); next();
+      toast(ct('Password changed ✓', 'पासवर्ड बदल गया ✓')); next();
     }
   };
 }
 function loginScreen0(next) {
+  IN_COUNTER = true;
+  const keep = { em: ($('#em') || {}).value || '', pw: ($('#pw') || {}).value || '', pin: ($('#pin') || {}).value || '' };
+  const title = next === counterView ? ct('Counter login', 'काउंटर लॉगिन') : ct('Admin login', 'एडमिन लॉगिन');
   if (DEMO) {
-    $('#app').innerHTML = `${demoBar()}<div class="login"><h1 class="brand">${esc(CONFIG.NAME)}</h1><p class="mute">${next === counterView ? 'Counter login' : 'Admin login'}</p>
-      <input id="pin" type="password" inputmode="numeric" autocomplete="off" aria-label="PIN" placeholder="PIN">
-      <button class="btn teal" data-act="login">Open counter</button></div>`;
-    const go = () => { if ($('#pin').value === CONFIG.COUNTER_PIN) { ls.set('vfe_auth', CONFIG.COUNTER_PIN); beep(); next(); } else toast('Wrong PIN', true); };
-    H = { login: go };
+    $('#app').innerHTML = `${demoBarC()}<div class="login">${clangBar()}<h1 class="brand">${esc(CONFIG.NAME)}</h1><p class="mute">${title}</p>
+      <input id="pin" type="password" inputmode="numeric" autocomplete="off" aria-label="PIN" placeholder="${ct('PIN', 'पिन')}" value="${esc(keep.pin)}">
+      <button class="btn teal" data-act="login">${ct('Open counter', 'काउंटर खोलें')}</button></div>`;
+    const go = () => { if ($('#pin').value === CONFIG.COUNTER_PIN) { ls.set('vfe_auth', CONFIG.COUNTER_PIN); beep(); next(); } else toast(ct('Wrong PIN', 'गलत पिन'), true); };
+    H = { login: go, clang: v => { setCLang(v); loginScreen0(next); } };
     $('#pin').addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
     return;
   }
-  $('#app').innerHTML = `<div class="login"><h1 class="brand">${esc(CONFIG.NAME)}</h1><p class="mute">${next === counterView ? 'Counter login' : 'Admin login'}</p>
-    <input id="em" class="lgi" type="email" autocomplete="username" placeholder="Email">
-    <input id="pw" class="lgi" type="password" autocomplete="current-password" placeholder="Password">
-    <button class="btn teal" data-act="login">Open</button>
-    <button class="lnk" data-act="forgot" style="margin-top:14px">पासवर्ड भूल गए? · Forgot password?</button></div>`;
+  $('#app').innerHTML = `<div class="login">${clangBar()}<h1 class="brand">${esc(CONFIG.NAME)}</h1><p class="mute">${title}</p>
+    <input id="em" class="lgi" type="email" autocomplete="username" placeholder="${ct('Email', 'ईमेल')}" value="${esc(keep.em)}">
+    <input id="pw" class="lgi" type="password" autocomplete="current-password" placeholder="${ct('Password', 'पासवर्ड')}" value="${esc(keep.pw)}">
+    <button class="btn teal" data-act="login">${ct('Open', 'खोलें')}</button>
+    <button class="lnk" data-act="forgot" style="margin-top:14px">${ct('Forgot password?', 'पासवर्ड भूल गए?')}</button></div>`;
   const go = async () => {
     const { error } = await sb.auth.signInWithPassword({ email: $('#em').value.trim().toLowerCase(), password: $('#pw').value });
-    if (error) { toast('Wrong email or password', true); return; }
+    if (error) { toast(ct('Wrong email or password', 'ईमेल या पासवर्ड गलत है'), true); return; }
     beep(); next();
   };
-  H = { login: go, forgot: () => forgotScreen(next) };
+  H = { login: go, forgot: () => forgotScreen(next), clang: v => { setCLang(v); loginScreen0(next); } };
   $('#pw').addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
 }
 
 function loginScreen(next) { loginScreen0(next || counterView); }
 async function counterView() {
-  document.title = 'Counter · ' + CONFIG.NAME;
+  IN_COUNTER = true;
+  document.title = ct('Counter', 'काउंटर') + ' · ' + CONFIG.NAME;
   if (RECOVERY && !DEMO) { recoveryScreen(counterView); return; }
   let authed;
   if (DEMO) authed = ls.get('vfe_auth') === CONFIG.COUNTER_PIN;
   else { const { data } = await sb.auth.getSession(); authed = !!(data && data.session); }
   if (!authed) { loginScreen(); return; }
 
-  const C = { tab: 'orders', orders: [], calls: [], ratings: [], pop: [], seen: null, seenC: null, sound: true, auto: ls.get('vfe_autoprint') === true, autobill: ls.get('vfe_autobill') !== false, autopay: ls.get('vfe_autopay') === true, pays: [], seenP: null, popPay: [], autoTry: new Set() };
-  const nextOf = { new: ['cooking', 'Start cooking'], cooking: ['ready', 'Mark ready'], ready: ['served', 'Mark served'] };
-  const payChip = o => `<span class="chipst ${o.pay_status}">${o.pay_status === 'paid' ? 'Paid' : o.pay_status === 'claimed' ? 'Pending Verification' : o.pay_method === 'cash' ? 'Will pay cash' : o.pay_method === 'online' ? 'Paying online' : 'Unpaid'}</span>`;
+  const C = { tab: 'orders', orders: [], calls: [], ratings: [], pop: [], seen: null, seenC: null, sound: true, auto: ls.get('vfe_autoprint') === true, autobill: ls.get('vfe_autobill') !== false, autopay: ls.get('vfe_autopay') === true, pays: [], seenP: null, popPay: [], autoTry: new Map(), autoBusy: new Set() };
+  const nextOf = { new: ['cooking', () => ct('Start cooking', 'बनाना शुरू करें')], cooking: ['ready', () => ct('Mark ready', 'तैयार है')], ready: ['served', () => ct('Mark served', 'परोस दिया')] };
+  const payChip = o => `<span class="chipst ${o.pay_status}">${o.pay_status === 'paid' ? ct('Paid', 'भुगतान हुआ') : o.pay_status === 'claimed' ? ct('Pending Verification', 'जाँच बाकी') : o.pay_method === 'cash' ? ct('Will pay cash', 'कैश देंगे') : o.pay_method === 'online' ? ct('Paying online', 'ऑनलाइन दे रहे') : ct('Unpaid', 'बाकी')}</span>`;
   const stars = n => '★'.repeat(n) + '☆'.repeat(5 - n);
+  const TBL = t => ct('Table ' + t, 'टेबल ' + t);
 
   function orderCard(o) {
-    return `<div class="oc2 ${o.status}"><div class="hd"><div class="tn"><small>Table</small>${o.table_no}</div><div class="meta">Order #${o.num}${o.phone ? ' · 📱 ' + esc(o.phone) : ''}<br>${tm(o.created_at)} · ${ago(o.created_at)}</div></div>
+    return `<div class="oc2 ${o.status}"><div class="hd"><div class="tn"><small>${ct('Table', 'टेबल')}</small>${o.table_no}</div><div class="meta">${ct('Order #', 'ऑर्डर #')}${o.num}${o.phone ? ' · 📱 ' + esc(o.phone) : ''}<br>${tm(o.created_at)} · ${ago(o.created_at)}</div></div>
       <ul>${o.items.map(i => `<li><b>${i.qty}×</b> ${esc(i.name)}</li>`).join('')}</ul>
-      ${o.note ? `<div class="note">Note: ${esc(o.note)}</div>` : ''}
+      ${o.note ? `<div class="note">${ct('Note:', 'नोट:')} ${esc(o.note)}</div>` : ''}
       <div>${rupee(o.total)} ${payChip(o)}</div>
-      <div class="acts"><button class="btn line sm" data-act="print" data-v="${o.id}">Print slip</button><button class="btn teal sm" data-act="next" data-v="${o.id}">${nextOf[o.status][1]}</button></div></div>`;
+      <div class="acts"><button class="btn line sm" data-act="print" data-v="${o.id}">${ct('Print slip', 'स्लिप प्रिंट करें')}</button><button class="btn teal sm" data-act="next" data-v="${o.id}">${nextOf[o.status][1]()}</button></div></div>`;
   }
 
   function alertHtml(c) {
     const amt = ((c.note || '').match(/Rs (\d+)/) || [])[1];
-    const T = `टेबल ${c.table_no} · Table ${c.table_no}`;
-    if (c.kind === 'waiter') return `<div class="alert waiter"><div><b class="at">${T}</b><span>वेटर बुला रहा है · needs the waiter · ${ago(c.created_at)}</span></div><button data-act="calldone" data-v="${c.id}">Done</button></div>`;
-    const a1 = amt ? ' (₹' + amt + ')' : '', a2 = amt ? ' ₹' + amt : '';
+    const T = TBL(c.table_no);
+    if (c.kind === 'waiter') return `<div class="alert waiter"><div><b class="at">${T}</b><span>${ct('Needs the waiter', 'वेटर बुला रहा है')} · ${ago(c.created_at)}</span></div><button data-act="calldone" data-v="${c.id}">${ct('Done ✅', 'हो गया ✅')}</button></div>`;
+    const a1 = amt ? ' (₹' + amt + ')' : '';
     const msg = /Says paid/.test(c.note || '')
-      ? `ग्राहक कहता है ऑनलाइन भुगतान कर दिया${a1} · Says paid online${a2}`
-      : /Wants to pay/.test(c.note || '') ? `ग्राहक कैश देना चाहता है${a1} · Wants to pay cash${a2}` : esc(c.note || '');
-    return `<div class="alert bill"><div><b class="at">${T}</b><span>${msg} · ${ago(c.created_at)}</span>${/Says paid/.test(c.note || '') ? tmatchHtml(c.table_no, true) : ''}</div><div class="aacts">${markBtn(c.table_no, '', 'Mark paid')}<button data-act="calldone" data-v="${c.id}">Done</button></div></div>`;
+      ? ct(`Customer says paid online${a1}`, `ग्राहक कहता है ऑनलाइन भुगतान कर दिया${a1}`)
+      : /Wants to pay/.test(c.note || '') ? ct(`Customer wants to pay cash${a1}`, `ग्राहक कैश देना चाहता है${a1}`) : esc(c.note || '');
+    return `<div class="alert bill"><div><b class="at">${T}</b><span>${msg} · ${ago(c.created_at)}</span>${/Says paid/.test(c.note || '') ? tmatchHtml(c.table_no, true) : ''}</div><div class="aacts">${markBtn(c.table_no, '', ct('Mark paid', 'भुगतान हुआ'))}<button data-act="calldone" data-v="${c.id}">${ct('Done ✅', 'हो गया ✅')}</button></div></div>`;
   }
 
-  /* ---------- v27: payment alert  <->  ordera ka milaan ---------- */
+  /* ---------- payment alert  <->  order ka milaan + Auto Pay ke niyam ---------- */
   const hhmm = ms => new Date(ms).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
   const claimAtOf = t => { const l = C.calls.filter(c => c.table_no === t && c.kind === 'bill' && /Says paid/.test(c.note || '')).map(c => new Date(c.created_at).getTime()); return l.length ? Math.max(...l) : null; };
+  const gkey = g => g.ids.join(',');
   function groupsNow() {
     const out = [], seen = new Set();
     for (let t = 1; t <= CONFIG.TABLES; t++) {
@@ -2000,25 +2075,47 @@ async function counterView() {
     return { g, payer, nm, amtOk, time, pAt, strong: amtOk && time === 'ok' && (nm === 'exact' || nm === 'close') };
   }
   const rankOf = m => (m.strong ? 100 : 0) + (m.nm === 'exact' ? 30 : m.nm === 'close' ? 20 : m.nm === 'unknown' ? 5 : 0) + (m.time === 'ok' ? 10 : 0) + (m.g.claimed ? 3 : 0);
+  /* verdict:
+       state 'ok'     = naam + raashi + samay teeno sahi aur ek hi match
+       state 'verify' = Pending Verification
+       state 'none'   = is raashi ka koi unpaid order nahi
+       autoKind       = Auto Pay chalu ho to apne-aap Paid ho sakta hai:
+          'name'  -> naam (chhoti galti chalegi) + raashi + samay sahi, ek hi match, grahak ne online chuna
+          'claim' -> naam nahi/alag, par raashi + samay sahi, payment aur order dono ka AKELA match, aur grahak ne "paid" dabaya */
   function verdicts() {
-    const gs = groupsNow(), res = {}, cnt = {};
+    const gs = groupsNow(), res = {}, amtCnt = {}, strongCnt = {};
     C.pays.filter(p => !p.used).forEach(p => {
-      const cands = gs.map(g => evalMatch(p, g)).filter(m => m.amtOk).sort((a, b) => rankOf(b) - rankOf(a));
-      res[p.id] = { p, cands, strongs: cands.filter(m => m.strong), best: cands[0] || null };
+      const cands = gs.map(g => evalMatch(p, g)).filter(m => m.amtOk).sort((x, y) => rankOf(y) - rankOf(x));
+      res[p.id] = { p, cands, strongs: cands.filter(m => m.strong), best: cands[0] || null, autoKind: null, autoM: null, autoOk: false };
     });
-    Object.values(res).forEach(r => r.strongs.forEach(m => { const k = m.g.ids.join(','); cnt[k] = (cnt[k] || 0) + 1; }));
+    Object.values(res).forEach(r => r.cands.forEach(m => { const k = gkey(m.g); amtCnt[k] = (amtCnt[k] || 0) + 1; if (m.strong) strongCnt[k] = (strongCnt[k] || 0) + 1; }));
     Object.values(res).forEach(r => {
-      const dup = r.strongs.some(m => cnt[m.g.ids.join(',')] > 1);
-      if (!r.cands.length) { r.state = 'none'; r.why = 'इस रकम का कोई unpaid ऑर्डर नहीं'; return; }
-      if (r.strongs.length === 1 && !dup) { r.state = 'ok'; r.best = r.strongs[0]; r.why = ''; return; }
+      if (!r.cands.length) { r.state = 'none'; r.why = 'none'; return; }
+      const dup = r.strongs.some(m => strongCnt[gkey(m.g)] > 1);
+      if (r.strongs.length === 1 && !dup) {
+        r.state = 'ok'; r.best = r.strongs[0]; r.why = ''; r.autoKind = 'name'; r.autoM = r.best; r.autoOk = r.best.g.online; return;
+      }
       r.state = 'verify';
       const b = r.best;
-      r.why = dup ? 'यही रकम दो alert में' : r.strongs.length > 1 ? 'कई टेबल मिलते हैं'
-        : b.nm === 'differ' ? 'नाम अलग' : b.nm === 'unknown' ? 'alert में नाम नहीं' : b.time !== 'ok' ? 'समय मेल नहीं' : 'कई टेबल की रकम बराबर';
+      r.why = dup ? 'dup' : r.strongs.length > 1 ? 'multi' : b.nm === 'differ' ? 'differ' : b.nm === 'unknown' ? 'unknown' : b.time !== 'ok' ? 'time' : 'amt_multi';
+      if (!dup && r.cands.length === 1) {
+        const m = r.cands[0];
+        if (m.time === 'ok' && m.g.claimed && amtCnt[gkey(m.g)] === 1) { r.autoKind = 'claim'; r.autoM = m; r.autoOk = true; }
+      }
     });
     return res;
   }
-  const whyOf = m => m.nm === 'differ' ? 'नाम अलग' : m.nm === 'unknown' ? 'alert में नाम नहीं' : m.time !== 'ok' ? 'समय मेल नहीं' : 'यह alert दूसरे ऑर्डर से भी मिलता है';
+  const whyOf = m => m.nm === 'differ' ? 'differ' : m.nm === 'unknown' ? 'unknown' : m.time !== 'ok' ? 'time' : 'other';
+  const whyText = c => ({
+    none: ct('No unpaid order for this amount', 'इस रकम का कोई बिना-भुगतान ऑर्डर नहीं'),
+    dup: ct('Same amount in two alerts', 'यही रकम दो अलर्ट में'),
+    multi: ct('Several tables match', 'कई टेबल मिलते हैं'),
+    differ: ct('Name differs', 'नाम अलग'),
+    unknown: ct('No name in alert', 'अलर्ट में नाम नहीं'),
+    time: ct('Time does not match', 'समय मेल नहीं'),
+    amt_multi: ct('Several tables have this amount', 'कई टेबल की रकम बराबर'),
+    other: ct('Alert also fits another order', 'यह अलर्ट दूसरे ऑर्डर से भी मिलता है')
+  })[c] || '';
   /* is table ke liye sabse achha alert; s = is table ki apni sthiti (ok / verify) */
   function matchFor(t) {
     let out = null;
@@ -2027,27 +2124,35 @@ async function counterView() {
     }));
     return out;
   }
-  const stateHtml = r => r.state === 'ok' ? '<div class="vstate ok">✔ Verified match · मिलान सही</div>'
-    : `<div class="vstate pv">⏳ Pending Verification · ${esc(r.why)}</div>`;
-  function chipsHtml(m) {
+  const stateHtml = s => s.state === 'ok' ? `<div class="vstate ok">${ct('✔ Verified match', '✔ मिलान सही')}</div>`
+    : `<div class="vstate pv">⏳ ${ct('Pending Verification', 'जाँच बाकी (Pending Verification)')} · ${whyText(s.why)}</div>`;
+  function chipsHtml(m, r) {
     const c = (k, s) => `<i class="mc ${k}">${s}</i>`, pn = esc(m.payer || '—'), cn = esc(m.g.name || '—');
-    const a = m.nm === 'exact' ? c('y', `नाम ✔ ${pn}`) : m.nm === 'close' ? c('w', `नाम ≈ ${pn} ↔ ${cn}`) : m.nm === 'differ' ? c('n', `नाम ✘ ${pn} ↔ ${cn}`) : c('g', `नाम ? alert में नहीं (${cn})`);
-    const tm_ = m.time === 'ok' ? c('y', `समय ✔ ${hhmm(m.pAt)}`) : c('n', `समय ✘ ${hhmm(m.pAt)} · ${({ early: 'ऑर्डर से पहले का', far: 'दावे से दूर', old: 'पुराना' })[m.time]}`);
-    return `<div class="mchips">${a}${c('y', `राशि ✔ ${rupee(m.g.amount)}`)}${tm_}${c('y', `ऑर्डर ✔ ${m.g.nums.map(n => '#' + n).join(',')}`)}${c('y', 'पहली बार ✔')}</div>`;
+    const a = m.nm === 'exact' ? c('y', ct(`Name ✔ ${pn}`, `नाम ✔ ${pn}`))
+      : m.nm === 'close' ? c('w', ct(`Name ≈ ${pn} ↔ ${cn}`, `नाम ≈ ${pn} ↔ ${cn}`))
+      : m.nm === 'differ' ? c('n', ct(`Name ✘ ${pn} ↔ ${cn}`, `नाम ✘ ${pn} ↔ ${cn}`))
+      : c('g', ct(`Name ? not in alert (${cn})`, `नाम ? अलर्ट में नहीं (${cn})`));
+    const why = { early: ct('before the order', 'ऑर्डर से पहले का'), far: ct('far from "paid" tap', 'दावे से दूर'), old: ct('old', 'पुराना') }[m.time];
+    const tm_ = m.time === 'ok' ? c('y', ct(`Time ✔ ${hhmm(m.pAt)}`, `समय ✔ ${hhmm(m.pAt)}`)) : c('n', ct(`Time ✘ ${hhmm(m.pAt)} · ${why}`, `समय ✘ ${hhmm(m.pAt)} · ${why}`));
+    let extra = '';
+    if (r && r.autoM === m && r.autoKind === 'claim') extra = c('y', ct('Only match ✔', 'अकेला मिलान ✔')) + c('y', ct('Customer tapped "I have paid" ✔', 'ग्राहक ने "भुगतान कर दिया" दबाया ✔'));
+    if (r && r.autoM === m && r.autoOk) extra += c('y', ct('Auto Pay eligible ✔', 'ऑटो पे योग्य ✔'));
+    return `<div class="mchips">${a}${c('y', ct(`Amount ✔ ${rupee(m.g.amount)}`, `राशि ✔ ${rupee(m.g.amount)}`))}${tm_}${c('y', ct(`Order ✔ ${m.g.nums.map(n => '#' + n).join(',')}`, `ऑर्डर ✔ ${m.g.nums.map(n => '#' + n).join(',')}`))}${c('y', ct('First use ✔', 'पहली बार ✔'))}${extra}</div>`;
   }
-  const noAlertHtml = amt => `<div class="vstate pv">⏳ Pending Verification · payment alert अभी नहीं आया</div><div class="mchips"><i class="mc g">${amt ? 'राशि ₹' + amt + ' · ' : ''}alert का इंतज़ार · अपना UPI जाँचें</i></div>`;
+  const noAlertHtml = amt => `<div class="vstate pv">⏳ ${ct('Pending Verification · payment alert not received yet', 'जाँच बाकी · पेमेंट अलर्ट अभी नहीं आया')}</div><div class="mchips"><i class="mc g">${amt ? ct('Amount ₹' + amt + ' · ', 'राशि ₹' + amt + ' · ') : ''}${ct('waiting for alert · check your UPI', 'अलर्ट का इंतज़ार · अपना UPI जाँचें')}</i></div>`;
+  const confirmTxt = s => s.state === 'ok' ? ct('Mark paid ✓', 'भुगतान हुआ ✓') : ct('Confirm manually', 'हाथ से पुष्टि करें');
   function payBtns(r, cls) {
-    if (r.state === 'ok') return `<button class="${cls || ''}" data-act="paypay" data-v="${r.p.id}|${r.best.g.ids.join(',')}">Table ${r.best.g.t} · Mark paid ✓</button>`;
-    return r.cands.slice(0, 3).map(m => `<button class="${cls || ''} warn" data-act="paypay" data-v="${r.p.id}|${m.g.ids.join(',')}">Table ${m.g.t} · Confirm manually</button>`).join('');
+    if (r.state === 'ok') return `<button class="${cls || ''}" data-act="paypay" data-v="${r.p.id}|${r.best.g.ids.join(',')}">${TBL(r.best.g.t)} · ${ct('Mark paid ✓', 'भुगतान हुआ ✓')}</button>`;
+    return r.cands.slice(0, 3).map(m => `<button class="${cls || ''} warn" data-act="paypay" data-v="${r.p.id}|${m.g.ids.join(',')}">${TBL(m.g.t)} · ${ct('Confirm manually', 'हाथ से पुष्टि')}</button>`).join('');
   }
   function markBtn(t, cls, label) {
     const mf = matchFor(t);
-    if (mf && mf.m.g.online) return `<button class="${cls}${mf.s.state === 'ok' ? '' : ' warn'}" data-act="paypay" data-v="${mf.r.p.id}|${mf.m.g.ids.join(',')}">${label}${mf.s.state === 'ok' ? ' ✓' : ' (verify)'}</button>`;
+    if (mf && mf.m.g.online) return `<button class="${cls}${mf.s.state === 'ok' ? '' : ' warn'}" data-act="paypay" data-v="${mf.r.p.id}|${mf.m.g.ids.join(',')}">${label}${mf.s.state === 'ok' ? ' ✓' : ct(' (verify)', ' (जाँचें)')}</button>`;
     return `<button class="${cls}" data-act="paid" data-v="${t}">${label}</button>`;
   }
   function tmatchHtml(t, claimed) {
     const mf = matchFor(t);
-    if (mf) return stateHtml(mf.s) + chipsHtml(mf.m);
+    if (mf) return stateHtml(mf.s) + chipsHtml(mf.m, mf.r);
     return claimed ? noAlertHtml('') : '';
   }
 
@@ -2058,14 +2163,14 @@ async function counterView() {
     const r = verdicts()[p.id];
     if (!r) return '';
     const rows = !r.cands.length ? '' : (r.state === 'ok' ? [r.best] : r.cands.slice(0, 3)).map(m =>
-      `<div class="crow"><b>टेबल ${m.g.t} · Table ${m.g.t}</b>${chipsHtml(m)}<div class="aacts">${r.state === 'ok'
-        ? `<button class="btn teal sm" data-act="paypay" data-v="${p.id}|${m.g.ids.join(',')}">Mark paid ✓</button>`
-        : `<button class="btn gold sm" data-act="paypay" data-v="${p.id}|${m.g.ids.join(',')}">Confirm manually</button>`}</div></div>`).join('');
+      `<div class="crow"><b>${TBL(m.g.t)}</b>${chipsHtml(m, r)}<div class="aacts">${r.state === 'ok'
+        ? `<button class="btn teal sm" data-act="paypay" data-v="${p.id}|${m.g.ids.join(',')}">${ct('Mark paid ✓', 'भुगतान हुआ ✓')}</button>`
+        : `<button class="btn gold sm" data-act="paypay" data-v="${p.id}|${m.g.ids.join(',')}">${ct('Confirm manually', 'हाथ से पुष्टि करें')}</button>`}</div></div>`).join('');
     return `<div class="scrim" style="z-index:60"></div><div class="notice" role="alertdialog"><div class="ni">₹</div>
-      <h2>${rupee(Math.round(+p.amount))} मिला · Payment alert</h2>
-      ${r.cands.length ? stateHtml(r) : `<div class="vstate pv">⚠ ${esc(r.why)}</div>`}
+      <h2>${rupee(Math.round(+p.amount))} ${ct('received · Payment alert', 'मिला · पेमेंट अलर्ट')}</h2>
+      ${r.cands.length ? stateHtml(r) : `<div class="vstate pv">⚠ ${whyText('none')}</div>`}
       <span class="rawtxt">${esc(String(p.raw || '').slice(0, 90))}</span>${rows}
-      <div class="aacts" style="justify-content:center;margin-top:12px"><button class="btn line sm" data-act="payignore" data-v="${p.id}">Ignore</button><button class="btn line sm" data-act="poppayclose">Later</button></div></div>`;
+      <div class="aacts" style="justify-content:center;margin-top:12px"><button class="btn line sm" data-act="payignore" data-v="${p.id}">${ct('Ignore', 'छोड़ें')}</button><button class="btn line sm" data-act="poppayclose">${ct('Later', 'बाद में')}</button></div></div>`;
   }
 
   function popupHtml() {
@@ -2075,63 +2180,63 @@ async function counterView() {
     if (!c) return '';
     const amt = ((c.note || '').match(/Rs (\d+)/) || [])[1], a = amt ? ' (₹' + amt + ')' : '';
     const mf = matchFor(c.table_no);
-    const info = mf ? stateHtml(mf.s) + chipsHtml(mf.m) : noAlertHtml(amt);
+    const info = mf ? stateHtml(mf.s) + chipsHtml(mf.m, mf.r) : noAlertHtml(amt);
     const btn = (mf && mf.m.g.online)
-      ? `<button class="btn ${mf.s.state === 'ok' ? 'teal' : 'gold'} sm" data-act="paypay" data-v="${mf.r.p.id}|${mf.m.g.ids.join(',')}">${mf.s.state === 'ok' ? 'Mark paid ✓' : 'Confirm manually'}</button>`
-      : `<button class="btn gold sm" data-act="paid" data-v="${c.table_no}">Confirm manually</button>`;
+      ? `<button class="btn ${mf.s.state === 'ok' ? 'teal' : 'gold'} sm" data-act="paypay" data-v="${mf.r.p.id}|${mf.m.g.ids.join(',')}">${confirmTxt(mf.s)}</button>`
+      : `<button class="btn gold sm" data-act="paid" data-v="${c.table_no}">${ct('Confirm manually', 'हाथ से पुष्टि करें')}</button>`;
     return `<div class="scrim" style="z-index:60"></div><div class="notice" role="alertdialog"><div class="ni">₹</div>
-      <h2>टेबल ${c.table_no} · Table ${c.table_no}</h2>
-      <p style="margin:0 0 4px;font-weight:700">ग्राहक कहता है भुगतान कर दिया${a}<br><span style="font-weight:600;color:#5B6B67">Customer says payment is done${a}</span></p>
+      <h2>${TBL(c.table_no)}</h2>
+      <p style="margin:0 0 4px;font-weight:700">${ct(`Customer says payment is done${a}`, `ग्राहक कहता है भुगतान कर दिया${a}`)}</p>
       ${info}
-      <div class="aacts" style="justify-content:center;margin-top:14px">${btn}<button class="btn line sm" data-act="notrecv" data-v="${c.table_no}">Not received</button><button class="btn line sm" data-act="popclose">Later</button></div></div>`;
+      <div class="aacts" style="justify-content:center;margin-top:14px">${btn}<button class="btn line sm" data-act="notrecv" data-v="${c.table_no}">${ct('Not received', 'नहीं मिला')}</button><button class="btn line sm" data-act="popclose">${ct('Later', 'बाद में')}</button></div></div>`;
   }
 
   function payHtml() {
     const V = verdicts(), l = C.pays.filter(p => !p.used);
     if (!l.length) return '';
     return `<div class="alerts">${l.map(p => { const r = V[p.id];
-      return `<div class="alert bill" style="flex-wrap:wrap"><div style="flex:1;min-width:230px"><b class="at">📲 ₹${Math.round(+p.amount)} मिला · Payment received on phone</b>
-        ${r.cands.length ? stateHtml(r) + chipsHtml(r.best) : `<div class="vstate pv">⚠ ${esc(r.why)}</div>`}<span class="rawtxt">${esc(String(p.raw || '').slice(0, 90))} · ${ago(p.created_at)}</span></div>
-      <div class="aacts">${payBtns(r, '')}<button data-act="payignore" data-v="${p.id}">Ignore</button></div></div>`; }).join('')}</div>`;
+      return `<div class="alert bill" style="flex-wrap:wrap"><div style="flex:1;min-width:230px"><b class="at">📲 ₹${Math.round(+p.amount)} ${ct('received · Payment alert', 'मिला · पेमेंट अलर्ट')}</b>
+        ${r.cands.length ? stateHtml(r) + chipsHtml(r.best, r) : `<div class="vstate pv">⚠ ${whyText('none')}</div>`}<span class="rawtxt">${esc(String(p.raw || '').slice(0, 90))} · ${ago(p.created_at)}</span></div>
+      <div class="aacts">${payBtns(r, '')}<button data-act="payignore" data-v="${p.id}">${ct('Ignore', 'छोड़ें')}</button></div></div>`; }).join('')}</div>`;
   }
 
   function render() {
     const calls = C.calls.filter(c => !c.done).sort(byTime);
     const active = C.orders.filter(o => o.status !== 'served').sort(byTime);
     const nNew = active.filter(o => o.status === 'new').length;
-    document.title = ((nNew + calls.length) ? `(${nNew + calls.length}) ` : '') + 'Counter · ' + CONFIG.NAME;
+    document.title = ((nNew + calls.length) ? `(${nNew + calls.length}) ` : '') + ct('Counter', 'काउंटर') + ' · ' + CONFIG.NAME;
     let body = '';
     if (C.tab === 'orders') {
-      const col = (st, title) => { const l = active.filter(o => o.status === st); return `<div class="col"><h3>${title}<span class="cnt">${l.length}</span></h3>${l.map(orderCard).join('') || '<p class="mute">Nothing here</p>'}</div>`; };
-      body = `<div class="cols">${col('new', 'New')}${col('cooking', 'Cooking')}${col('ready', 'Ready to serve')}</div>`;
+      const col = (st, title) => { const l = active.filter(o => o.status === st); return `<div class="col"><h3>${title}<span class="cnt">${l.length}</span></h3>${l.map(orderCard).join('') || `<p class="mute">${ct('Nothing here', 'यहाँ कुछ नहीं')}</p>`}</div>`; };
+      body = `<div class="cols">${col('new', ct('New', 'नए'))}${col('cooking', ct('Cooking', 'बन रहे हैं'))}${col('ready', ct('Ready to serve', 'परोसने को तैयार'))}</div>`;
     } else if (C.tab === 'tables') {
       let cards = '';
       for (let t = 1; t <= CONFIG.TABLES; t++) {
         const u = C.orders.filter(o => o.table_no === t && o.pay_status !== 'paid');
         const amt = sum(u, o => o.total), wants = C.calls.some(c => c.table_no === t && c.kind === 'bill' && !c.done);
         const hasClaim = u.some(o => o.pay_status === 'claimed');
-        const how = !u.length ? '' : u.every(o => o.pay_status === 'claimed') ? 'Says paid online. Check your UPI app.' : u.every(o => o.pay_method === 'cash') ? 'Will pay cash' : u.every(o => o.pay_method === 'online') ? 'Paying online' : 'Still eating';
-        cards += `<div class="tcard ${u.length ? (wants ? 'pay' : 'busy') : ''}"><div class="tn"><small>Table</small>${t}</div>
+        const how = !u.length ? '' : u.every(o => o.pay_status === 'claimed') ? ct('Says paid online. Check your UPI app.', 'ग्राहक कहता है ऑनलाइन भुगतान कर दिया। अपना UPI ऐप जाँचें।') : u.every(o => o.pay_method === 'cash') ? ct('Will pay cash', 'कैश देंगे') : u.every(o => o.pay_method === 'online') ? ct('Paying online', 'ऑनलाइन भुगतान कर रहे') : ct('Still eating', 'अभी खा रहे हैं');
+        cards += `<div class="tcard ${u.length ? (wants ? 'pay' : 'busy') : ''}"><div class="tn"><small>${ct('Table', 'टेबल')}</small>${t}</div>
           ${u.length ? `<div class="amt">${rupee(amt)}</div><div class="ds">${how}</div>${tmatchHtml(t, hasClaim)}
-          <div class="acts"><button class="btn line sm" data-act="bill" data-v="${t}">Print bill</button>${markBtn(t, 'btn teal sm', 'Mark paid')}</div>
-          ${hasClaim ? `<div class="acts" style="grid-template-columns:1fr"><button class="btn line sm" style="border-color:#C0392B;color:#C0392B" data-act="notrecv" data-v="${t}">Payment not received</button></div>` : ''}` : '<div class="mute">Free</div>'}</div>`;
+          <div class="acts"><button class="btn line sm" data-act="bill" data-v="${t}">${ct('Print bill', 'बिल प्रिंट करें')}</button>${markBtn(t, 'btn teal sm', ct('Mark paid', 'भुगतान हुआ'))}</div>
+          ${hasClaim ? `<div class="acts" style="grid-template-columns:1fr"><button class="btn line sm" style="border-color:#C0392B;color:#C0392B" data-act="notrecv" data-v="${t}">${ct('Payment not received', 'भुगतान नहीं मिला')}</button></div>` : ''}` : `<div class="mute">${ct('Free', 'खाली')}</div>`}</div>`;
       }
       body = `<div class="tgrid">${cards}</div>`;
     } else if (C.tab === 'ratings') {
       const r = C.ratings, avg = r.length ? (sum(r, x => x.stars) / r.length) : 0;
-      body = `<div class="stats"><div class="stat">Average / औसत रेटिंग<b>${r.length ? avg.toFixed(1) + ' ★' : '—'}</b></div><div class="stat">Ratings / रेटिंग की संख्या<b>${r.length}</b></div></div>
-        <table class="tbl"><tr><th>When</th><th>Table</th><th>Stars</th><th>Comment</th></tr>${r.map(x => `<tr><td>${fdt(x.created_at)}</td><td>${x.table_no || ''}</td><td style="color:#C98A00;white-space:nowrap">${stars(x.stars)}</td><td>${esc(x.comment || '')}</td></tr>`).join('') || '<tr><td colspan="4" class="mute">No ratings yet</td></tr>'}</table>`;
+      body = `<div class="stats"><div class="stat">${ct('Average rating', 'औसत रेटिंग')}<b>${r.length ? avg.toFixed(1) + ' ★' : '—'}</b></div><div class="stat">${ct('Number of ratings', 'रेटिंग की संख्या')}<b>${r.length}</b></div></div>
+        <table class="tbl"><tr><th>${ct('When', 'कब')}</th><th>${ct('Table', 'टेबल')}</th><th>${ct('Stars', 'स्टार')}</th><th>${ct('Comment', 'टिप्पणी')}</th></tr>${r.map(x => `<tr><td>${fdt(x.created_at)}</td><td>${x.table_no || ''}</td><td style="color:#C98A00;white-space:nowrap">${stars(x.stars)}</td><td>${esc(x.comment || '')}</td></tr>`).join('') || `<tr><td colspan="4" class="mute">${ct('No ratings yet', 'अभी कोई रेटिंग नहीं')}</td></tr>`}</table>`;
     } else {
       const today = C.orders, paid = today.filter(o => o.pay_status === 'paid');
       const cash = sum(paid.filter(o => o.pay_method === 'cash'), o => o.total), online = sum(paid.filter(o => o.pay_method !== 'cash'), o => o.total);
-      body = `<div class="stats"><div class="stat">Sales received<b>${rupee(cash + online)}</b></div><div class="stat">Cash<b>${rupee(cash)}</b></div><div class="stat">Online<b>${rupee(online)}</b></div><div class="stat">Orders today<b>${today.length}</b></div><div class="stat">Not paid yet<b>${rupee(sum(today.filter(o => o.pay_status !== 'paid'), o => o.total))}</b></div></div>
-        <div style="padding:0 14px 10px"><button class="btn line sm" data-act="exportcsv">Download today's sales (CSV)</button></div>
-        <table class="tbl"><tr><th>Time</th><th>Table</th><th>Order</th><th>Amount</th><th>Payment</th></tr>${today.slice().sort((a, b) => byTime(b, a)).map(o => `<tr><td>${tm(o.created_at)}</td><td>${o.table_no}</td><td>#${o.num}</td><td>${rupee(o.total)}</td><td>${payChip(o)}</td></tr>`).join('') || '<tr><td colspan="5" class="mute">No orders today</td></tr>'}</table>`;
+      body = `<div class="stats"><div class="stat">${ct('Sales received', 'मिली बिक्री')}<b>${rupee(cash + online)}</b></div><div class="stat">${ct('Cash', 'कैश')}<b>${rupee(cash)}</b></div><div class="stat">${ct('Online', 'ऑनलाइन')}<b>${rupee(online)}</b></div><div class="stat">${ct('Orders today', 'आज के ऑर्डर')}<b>${today.length}</b></div><div class="stat">${ct('Not paid yet', 'अभी बाकी')}<b>${rupee(sum(today.filter(o => o.pay_status !== 'paid'), o => o.total))}</b></div></div>
+        <div style="padding:0 14px 10px"><button class="btn line sm" data-act="exportcsv">${ct("Download today's sales (CSV)", 'आज की बिक्री डाउनलोड करें (CSV)')}</button></div>
+        <table class="tbl"><tr><th>${ct('Time', 'समय')}</th><th>${ct('Table', 'टेबल')}</th><th>${ct('Order', 'ऑर्डर')}</th><th>${ct('Amount', 'राशि')}</th><th>${ct('Payment', 'भुगतान')}</th></tr>${today.slice().sort((a, b) => byTime(b, a)).map(o => `<tr><td>${tm(o.created_at)}</td><td>${o.table_no}</td><td>#${o.num}</td><td>${rupee(o.total)}</td><td>${payChip(o)}</td></tr>`).join('') || `<tr><td colspan="5" class="mute">${ct('No orders today', 'आज कोई ऑर्डर नहीं')}</td></tr>`}</table>`;
     }
-    $('#app').innerHTML = `${demoBar()}<div class="cn-top"><span class="brand">${esc(CONFIG.NAME)}</span><small style="opacity:.65">v${APP_BUILD}</small>
-      ${['orders', 'tables', 'today', 'ratings'].map(t => `<button class="tab ${C.tab === t ? 'on' : ''}" data-act="ctab" data-v="${t}">${{ orders: 'Orders', tables: 'Tables & bills', today: 'Today', ratings: 'Ratings' }[t]}</button>`).join('')}
-      <div class="sp"><button class="sbtn" data-act="sound">Sound: ${C.sound ? 'On' : 'Off'}</button><label><input type="checkbox" data-act="auto" ${C.auto ? 'checked' : ''}> Auto-print new orders</label><label><input type="checkbox" data-act="autopay" ${C.autopay ? 'checked' : ''}> Auto Mark paid (सिर्फ़ पक्का मिलान + ग्राहक ने "paid" दबाया)</label><label><input type="checkbox" data-act="autobill" ${C.autobill ? 'checked' : ''}> Auto-print bill after paid</label><a class="sbtn" href="?admin" style="text-decoration:none">Admin</a><button class="sbtn" data-act="logout">Log out</button></div></div>
-      ${C.sound && !audioOK() ? '<div class="demo" style="background:#FDE2E0;color:#8A1C12;cursor:pointer;font-size:15px;padding:10px" data-act="unlock">Sound abhi band hai. Yahan ek baar dabao, tab alert bajega.</div>' : ''}${payHtml()}${calls.length ? `<div class="alerts">${calls.map(alertHtml).join('')}</div>` : ''}${body}${popupHtml()}`;
+    $('#app').innerHTML = `${demoBarC()}<div class="cn-top"><span class="brand">${esc(CONFIG.NAME)}</span><small style="opacity:.65">v${APP_BUILD}</small>
+      ${['orders', 'tables', 'today', 'ratings'].map(t => `<button class="tab ${C.tab === t ? 'on' : ''}" data-act="ctab" data-v="${t}">${{ orders: ct('Orders', 'ऑर्डर'), tables: ct('Tables & bills', 'टेबल और बिल'), today: ct('Today', 'आज'), ratings: ct('Ratings', 'रेटिंग') }[t]}</button>`).join('')}
+      <div class="sp">${clangBar()}<button class="sbtn" data-act="sound">${ct('Sound: ', 'आवाज़: ')}${C.sound ? ct('On', 'चालू') : ct('Off', 'बंद')}</button><label><input type="checkbox" data-act="auto" ${C.auto ? 'checked' : ''}> ${ct('Auto-print new orders', 'नए ऑर्डर अपने-आप प्रिंट')}</label><label title="${ct('Marks an order paid by itself only when the payment alert matches reliably', 'पेमेंट अलर्ट पक्का मिलने पर ही ऑर्डर अपने-आप भुगतान-दर्ज होता है')}"><input type="checkbox" data-act="autopay" ${C.autopay ? 'checked' : ''}> ${ct('Auto Pay', 'ऑटो पे')}</label><label><input type="checkbox" data-act="autobill" ${C.autobill ? 'checked' : ''}> ${ct('Auto-print bill after paid', 'भुगतान के बाद बिल अपने-आप प्रिंट')}</label><a class="sbtn" href="?admin" style="text-decoration:none">${ct('Admin', 'एडमिन')}</a><button class="sbtn" data-act="logout">${ct('Log out', 'लॉग आउट')}</button></div></div>
+      ${C.sound && !audioOK() ? `<div class="demo" style="background:#FDE2E0;color:#8A1C12;cursor:pointer;font-size:15px;padding:10px" data-act="unlock">${ct('Sound is off. Tap here once to turn alerts on.', 'आवाज़ अभी बंद है। अलर्ट बजाने के लिए यहाँ एक बार दबाएँ।')}</div>` : ''}${payHtml()}${calls.length ? `<div class="alerts">${calls.map(alertHtml).join('')}</div>` : ''}${body}${popupHtml()}`;
   }
 
   const sync = startSync(async () => {
@@ -2157,10 +2262,13 @@ async function counterView() {
       np.forEach(p => C.popPay.push(p.id));
     }
     if (C.autopay) {
-      // sirf: naam + raashi + samay sahi, ek hi match, aur grahak ne "paid" dabaya ho
-      const V = verdicts();
-      Object.values(V).forEach(r => {
-        if (r.state === 'ok' && r.best.g.claimed && !C.autoTry.has(r.p.id)) { C.autoTry.add(r.p.id); H.paypay(r.p.id + '|' + r.best.g.ids.join(',')).catch(err => console.error(err)); }
+      // Auto Pay: sirf wahi jo verdicts() "autoOk" bataye (naam+raashi+samay, ya akela match + grahak ne paid dabaya)
+      Object.values(verdicts()).forEach(r => {
+        if (!r.autoOk || r.state === 'none') return;
+        const n = C.autoTry.get(r.p.id) || 0;
+        if (n >= 3 || C.autoBusy.has(r.p.id)) return;
+        C.autoTry.set(r.p.id, n + 1); C.autoBusy.add(r.p.id);
+        H.paypay(r.p.id + '|' + r.autoM.g.ids.join(','), true).catch(err => console.error(err)).finally(() => C.autoBusy.delete(r.p.id));
       });
     }
     C.seenP = new Set(C.pays.map(p => p.id));
@@ -2185,23 +2293,25 @@ async function counterView() {
     auto: (v, el) => { C.auto = el.checked; ls.set('vfe_autoprint', C.auto); },
     autopay: (v, el) => { C.autopay = el.checked; ls.set('vfe_autopay', C.autopay); },
     poppayclose: () => { C.popPay.shift(); render(); },
-    paypay: async v => {
+    clang: v => { setCLang(v); render(); },
+    paypay: async (v, auto) => {
       const [pid, idl] = v.split('|'), ids = (idl || '').split(',');
       const p = C.pays.find(x => x.id === pid), u = C.orders.filter(o => ids.includes(o.id) && o.pay_status !== 'paid');
-      if (!p || p.used || !u.length || u.length !== ids.length) { toast('यह पेमेंट या ऑर्डर पहले ही इस्तेमाल हो चुका है · Already used', true); await sync(); return; }
-      if (Math.abs(+p.amount - sum(u, o => o.total)) > 0.005) { toast('राशि मेल नहीं खाती · Amount does not match', true); return; }
+      if (!p || p.used || !u.length || u.length !== ids.length) { toast(ct('This payment or order is already used', 'यह पेमेंट या ऑर्डर पहले ही इस्तेमाल हो चुका है'), true); await sync(); return false; }
+      if (Math.abs(+p.amount - sum(u, o => o.total)) > 0.005) { toast(ct('Amount does not match', 'राशि मेल नहीं खाती'), true); return false; }
       try { await store.confirmPayment(p.id, ids); }
       catch (e) {
         console.error(e);
-        toast(/already used/.test(e.message || '') ? 'यह पेमेंट पहले ही इस्तेमाल हो चुका है · Payment already used' : 'दर्ज नहीं हुआ · Not recorded: ' + (e.message || ''), true);
-        await sync(); return;
+        toast(/already used/.test(e.message || '') ? ct('Payment already used', 'यह पेमेंट पहले ही इस्तेमाल हो चुका है') : ct('Not recorded: ', 'दर्ज नहीं हुआ: ') + (e.message || ''), true);
+        await sync(); return false;
       }
       const nowIso = new Date().toISOString(), t = u[0].table_no;
       if (!C.orders.some(o => o.table_no === t && o.pay_status !== 'paid' && !ids.includes(o.id)))
         await store.patchCalls(C.calls.filter(c => c.table_no === t && c.kind === 'bill' && !c.done).map(c => c.id), { done: true });
-      toast('Table ' + t + ' marked paid ✓'); await sync();
+      toast((auto === true ? ct('Auto Pay: ', 'ऑटो पे: ') : '') + ct('Table ' + t + ' marked paid ✓', 'टेबल ' + t + ' का भुगतान दर्ज ✓')); await sync();
       const bl = u.map(o => ({ ...o, pay_status: 'paid', pay_method: 'online', paid_at: nowIso }));
       showBillModal(bl, (bl.find(o => o.phone) || {}).phone || '', C.autobill);
+      return true;
     },
     payignore: async v => { await store.usePayment(v, null); await sync(); },
     autobill: (v, el) => { C.autobill = el.checked; ls.set('vfe_autobill', C.autobill); },
@@ -2213,14 +2323,19 @@ async function counterView() {
     },
     print: v => printHtml(slipOrder(C.orders.find(o => o.id === v))),
     next: async v => { const o = C.orders.find(x => x.id === v), to = nextOf[o.status][0]; await store.patchOrders([v], { status: to, [to + '_at']: new Date().toISOString() }); await sync(); },
-    calldone: async v => { await store.patchCalls([v], { done: true }); await sync(); },
+    calldone: async v => {
+      const c = C.calls.find(x => x.id === v);
+      await store.patchCalls([v], { done: true });
+      if (c && c.kind === 'waiter') { store.pingWaiter(c.table_no); toast(ct('Waiter assigned. Customer has been told.', 'वेटर नियुक्त हुआ। ग्राहक को बता दिया गया।')); }
+      await sync();
+    },
     bill: v => printHtml(slipBill(v, C.orders.filter(o => o.table_no === +v && o.pay_status !== 'paid'))),
     paid: async v => {
       const t = +v, u = C.orders.filter(o => o.table_no === t && o.pay_status !== 'paid');
       const nowIso = new Date().toISOString(), meth = (u[0] || {}).pay_method || 'cash';
       await store.patchOrders(u.map(o => o.id), { pay_status: 'paid', pay_method: meth, paid_at: nowIso });
       await store.patchCalls(C.calls.filter(c => c.table_no === t && c.kind === 'bill' && !c.done).map(c => c.id), { done: true });
-      toast('Table ' + t + ' marked paid'); await sync();
+      toast(ct('Table ' + t + ' marked paid', 'टेबल ' + t + ' का भुगतान दर्ज')); await sync();
       if (u.length) {
         // bill apne-aap nikal aaye (popup + agar chaaho to seedha print)
         const bl = u.map(o => ({ ...o, pay_status: 'paid', pay_method: meth, paid_at: nowIso }));
@@ -2231,10 +2346,10 @@ async function counterView() {
       const t = +v, u = C.orders.filter(o => o.table_no === t && o.pay_status === 'claimed');
       await store.patchOrders(u.map(o => o.id), { pay_status: 'unpaid', pay_method: null });
       await store.patchCalls(C.calls.filter(c => c.table_no === t && c.kind === 'bill' && !c.done).map(c => c.id), { done: true });
-      toast('Table ' + t + ': payment marked as not received'); await sync();
+      toast(ct('Table ' + t + ': payment marked as not received', 'टेबल ' + t + ': भुगतान नहीं मिला दर्ज किया')); await sync();
     },
     exportcsv: () => {
-      const rows = [['Time', 'Table', 'Order', 'Items', 'Total', 'Payment', 'Method']];
+      const rows = [[ct('Time', 'समय'), ct('Table', 'टेबल'), ct('Order', 'ऑर्डर'), ct('Items', 'आइटम'), ct('Total', 'कुल'), ct('Payment', 'भुगतान'), ct('Method', 'तरीका')]];
       C.orders.forEach(o => rows.push([fdt(o.created_at), o.table_no, o.num, o.items.map(i => i.qty + ' x ' + i.name).join('; '), o.total, o.pay_status, o.pay_method || '']));
       const csv = rows.map(r => r.map(x => '"' + String(x).replace(/"/g, '""') + '"').join(',')).join('\n');
       const a = document.createElement('a');
@@ -2269,6 +2384,7 @@ function imgToData(file, max, q) {
   });
 }
 async function adminView() {
+  IN_COUNTER = false;
   document.title = 'Admin · ' + CONFIG.NAME;
   if (RECOVERY && !DEMO) { recoveryScreen(adminView); return; }
   let authed;
