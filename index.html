@@ -1471,7 +1471,7 @@ function customerView(tableNo) {
   const appLink = a => /Android/i.test(navigator.userAgent)
     ? `intent://#Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;package=${a[1]};S.browser_fallback_url=${encodeURIComponent('https://play.google.com/store/apps/details?id=' + a[1])};end`
     : a[2];
-  const upiLink = (amt, t) => `upi://pay?pa=${CONFIG.UPI_ID}&pn=${encodeURIComponent(CONFIG.UPI_NAME)}&am=${amt}&cu=INR&tn=${encodeURIComponent('Table ' + (t || ''))}`;
+  const upiLink = (amt, t) => `upi://pay?pa=${CONFIG.UPI_ID}&pn=${encodeURIComponent(CONFIG.UPI_NAME)}&cu=INR`; // amount deliberately NOT filled: customer types it
 
   const homeHtml = () => `<div class="home">
     <button class="bigbtn" data-act="go" data-v="menu"><span class="bi1"><svg viewBox="0 0 32 32" width="34" height="34" fill="none" stroke="#E9D49A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 11h18l-1.6 15H8.6L7 11z"/><path d="M11.5 14V9.5a4.5 4.5 0 0 1 9 0V14"/></svg></span><span>${L('Place a new order')}</span></button>
@@ -1613,12 +1613,7 @@ function customerView(tableNo) {
         pay = `<div class="pay"><h3><span>${L('Payment')}</span><span>${rupee(amt)}</span></h3><p>${bi(`Please pay ${rupee(amt)} in cash at the counter. Staff has been told.`, `कृपया काउंटर पर ${rupee(amt)} नकद दें। स्टाफ़ को बता दिया गया है।`)}</p><div class="row"><button class="btn line" data-act="changepay">${L('Change method')}</button></div></div>`;
       } else if (method === 'online') {
         S.qr = { amt, tbl };
-        pay = `<div class="pay"><h3><span>${L('Pay online')}</span><span>${rupee(amt)}</span></h3><div class="amtbig"><small>${bi('Amount to pay', 'आपको कितना पे करना है')}</small><b>${rupee(amt)}</b></div>
-          <button class="cpbig" data-act="copyupi"><span>📋 ${bi('Copy UPI ID', 'UPI ID कॉपी करें')}</span><b id="upiidtxt">${esc(CONFIG.UPI_ID)}</b></button>
-          <div class="howto"><p>1. ${bi('Copy the UPI ID with the button above', 'ऊपर वाले बटन से UPI ID कॉपी करें')}</p><p>2. ${bi('Open your UPI app below', 'नीचे अपना UPI ऐप खोलें')}</p><p>3. ${bi(`In the app choose “Pay to UPI ID / Mobile”, paste it, enter ${rupee(amt)} and pay`, `ऐप में “UPI ID / मोबाइल पर पे करें” चुनें, पेस्ट करें, ${rupee(amt)} डालें और पे करें`)}</p></div>
-          <p class="ds" style="text-align:center;font-weight:700">${bi('Open app', 'ऐप खोलें')}</p>
-          <div class="apps">${UPI_APPS.map(a => `<a href="${esc(appLink(a))}" data-act="openapp">${a[0]}</a>`).join('')}</div>
-          <p class="ds" style="text-align:center;font-size:12px">${bi('If an app does not open, open it yourself – the ID is already copied.', 'अगर ऐप न खुले तो खुद खोल लें – ID पहले ही कॉपी हो चुकी है।')}</p>
+        pay = `<div class="pay"><h3><span>${L('Pay online')}</span><span>${rupee(amt)}</span></h3><div class="upi"><div id="upiqr"></div><p class="ds">${bi(`Scan with any UPI app, then enter ${rupee(amt)} and pay`, `किसी भी UPI ऐप से स्कैन करें, फिर ${rupee(amt)} खुद डालकर पे करें`)}</p><p class="upiid">UPI ID: ${esc(CONFIG.UPI_ID)}</p><a class="btn teal sm" href="${upiLink(amt, tbl)}">${L('Open UPI app')}</a></div>
           <p class="ds" style="margin-top:10px">${L('After paying, tap the button below.')}</p>
           <div class="row"><button class="btn gold" data-act="paid">${L('I have paid online')}</button><button class="btn line" data-act="changepay">${L('Change method')}</button></div></div>`;
       } else {
