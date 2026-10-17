@@ -1471,7 +1471,7 @@ function customerView(tableNo) {
   const appLink = a => /Android/i.test(navigator.userAgent)
     ? `intent://#Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;package=${a[1]};S.browser_fallback_url=${encodeURIComponent('https://play.google.com/store/apps/details?id=' + a[1])};end`
     : a[2];
-  const upiLink = (amt, t) => `upi://pay?pa=${CONFIG.UPI_ID}&pn=${encodeURIComponent(CONFIG.UPI_NAME)}&cu=INR`; // amount deliberately NOT filled: customer types it
+  const upiLink = (amt, t) => `upi://pay?pa=${CONFIG.UPI_ID}`; // plain ID only (like typing it by hand): no amount, no name, no merchant flags
 
   const homeHtml = () => `<div class="home">
     <button class="bigbtn" data-act="go" data-v="menu"><span class="bi1"><svg viewBox="0 0 32 32" width="34" height="34" fill="none" stroke="#E9D49A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 11h18l-1.6 15H8.6L7 11z"/><path d="M11.5 14V9.5a4.5 4.5 0 0 1 9 0V14"/></svg></span><span>${L('Place a new order')}</span></button>
@@ -1614,6 +1614,7 @@ function customerView(tableNo) {
       } else if (method === 'online') {
         S.qr = { amt, tbl };
         pay = `<div class="pay"><h3><span>${L('Pay online')}</span><span>${rupee(amt)}</span></h3><div class="upi"><div id="upiqr"></div><p class="ds">${bi(`Scan with any UPI app, then enter ${rupee(amt)} and pay`, `किसी भी UPI ऐप से स्कैन करें, फिर ${rupee(amt)} खुद डालकर पे करें`)}</p><p class="upiid">UPI ID: ${esc(CONFIG.UPI_ID)}</p><a class="btn teal sm" href="${upiLink(amt, tbl)}">${L('Open UPI app')}</a></div>
+          <p class="ds" style="text-align:center;font-size:13px;color:#8a5a00">${bi('Pay from your bank savings account (not a credit card, wallet or overdraft).', 'पेमेंट अपने बैंक के बचत खाते से करें (क्रेडिट कार्ड, वॉलेट या ओवरड्राफ्ट से नहीं)।')}</p>
           <p class="ds" style="margin-top:10px">${L('After paying, tap the button below.')}</p>
           <div class="row"><button class="btn gold" data-act="paid">${L('I have paid online')}</button><button class="btn line" data-act="changepay">${L('Change method')}</button></div></div>`;
       } else {
