@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="app-build" content="30">
+<meta name="app-build" content="31">
 <meta name="theme-color" content="#0F3D38">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Vrindavan Food Enterprise</title>
@@ -855,7 +855,7 @@ const mem = { orders: [], calls: [], ratings: [] };
 const dRead = k => ls.get('vfe_' + k) || mem[k];
 const dWrite = (k, v) => { mem[k] = v; ls.set('vfe_' + k, v); };
 
-const APP_BUILD = '30';
+const APP_BUILD = '31';
 // naya version GitHub par aaya ho to khuli screen par laal patti dikhao
 async function checkUpdate() {
   try {
@@ -1612,13 +1612,14 @@ function customerView(tableNo) {
       } else if (method === 'cash') {
         pay = `<div class="pay"><h3><span>${L('Payment')}</span><span>${rupee(amt)}</span></h3><p>${bi(`Please pay ${rupee(amt)} in cash at the counter. Staff has been told.`, `कृपया काउंटर पर ${rupee(amt)} नकद दें। स्टाफ़ को बता दिया गया है।`)}</p><div class="row"><button class="btn line" data-act="changepay">${L('Change method')}</button></div></div>`;
       } else if (method === 'online') {
-        S.qr = { amt, tbl };
-        pay = `<div class="pay"><h3><span>${L('Pay online')}</span><span>${rupee(amt)}</span></h3>${DEMO ? '' : `<button class="btn gold" id="rzbtn" data-act="rzpay" style="width:100%;font-size:18px;padding:14px">💳 ${bi('Pay ' + rupee(amt) + ' now (UPI / Card)', rupee(amt) + ' अभी पे करें (UPI / कार्ड)')}</button><p class="ds" style="text-align:center;font-size:13px">${bi('The amount is filled in for you. Your bill is ready as soon as the payment succeeds.', 'राशि अपने-आप भरी आएगी। पेमेंट होते ही आपका बिल तैयार हो जाएगा।')}</p><p class="ds" style="text-align:center;margin-top:12px;font-weight:700">${bi('Or pay by scanning / typing the UPI ID', 'या QR स्कैन करके / UPI ID डालकर पे करें')}</p>`}<div class="upi"><div id="upiqr"></div><p class="ds">${bi(`Scan with any UPI app, then enter ${rupee(amt)} and pay`, `किसी भी UPI ऐप से स्कैन करें, फिर ${rupee(amt)} खुद डालकर पे करें`)}</p><p class="upiid">UPI ID: ${esc(CONFIG.UPI_ID)}</p><a class="btn teal sm" href="${upiLink(amt, tbl)}">${L('Open UPI app')}</a></div>
-          <p class="ds" style="text-align:center;font-size:13px;color:#8a5a00">${bi('Pay from your bank savings account (not a credit card, wallet or overdraft).', 'पेमेंट अपने बैंक के बचत खाते से करें (क्रेडिट कार्ड, वॉलेट या ओवरड्राफ्ट से नहीं)।')}</p>
-          <p class="ds" style="margin-top:10px">${L('After paying, tap the button below.')}</p>
-          <div class="row"><button class="btn gold" data-act="paid">${L('I have paid online')}</button><button class="btn line" data-act="changepay">${L('Change method')}</button></div></div>`;
+        pay = `<div class="pay"><h3><span>${L('Pay online')}</span><span>${rupee(amt)}</span></h3>
+          <div class="amtbig"><small>${bi('Amount to pay', 'आपको कितना पे करना है')}</small><b>${rupee(amt)}</b></div>
+          ${DEMO ? `<p class="ds" style="text-align:center">${bi('Online payment works only on the live site.', 'ऑनलाइन पेमेंट सिर्फ़ लाइव साइट पर चलता है।')}</p>` : `<button class="btn gold" id="rzbtn" data-act="rzpay" style="width:100%;font-size:19px;padding:15px">🔒 ${bi('Pay ' + rupee(amt) + ' securely', rupee(amt) + ' सुरक्षित रूप से पे करें')}</button>
+          <p class="ds" style="text-align:center;font-size:13px;margin-top:8px">${bi('UPI apps · UPI QR · Debit card · Credit card · Net banking. The amount is filled in for you.', 'UPI ऐप · UPI QR · डेबिट कार्ड · क्रेडिट कार्ड · नेट बैंकिंग। राशि अपने-आप भरी आएगी।')}</p>
+          <p class="ds" style="text-align:center;font-size:12px">${bi('Powered by Razorpay. Your bill is ready as soon as the payment succeeds.', 'Razorpay द्वारा सुरक्षित। पेमेंट होते ही आपका बिल तैयार हो जाएगा।')}</p>`}
+          <div class="row"><button class="btn line" data-act="rzcheck">${bi('Paid but no bill? Check', 'पेमेंट कर दिया पर बिल नहीं आया? जाँचें')}</button><button class="btn line" data-act="changepay">${L('Change method')}</button></div></div>`;
       } else {
-        pay = `<div class="pay"><h3><span>${L('Bill so far')}</span><span>${rupee(amt)}</span></h3><p class="ds">${L('Want something more? Order again from the Menu tab. When you are done, choose how to pay.')}</p><div class="row"><button class="btn teal" data-act="paycash">${L('Pay cash')}</button>${CONFIG.UPI_ID ? `<button class="btn teal" data-act="payonline">${L('Pay online')}</button>` : ''}</div></div>`;
+        pay = `<div class="pay"><h3><span>${L('Bill so far')}</span><span>${rupee(amt)}</span></h3><p class="ds">${L('Want something more? Order again from the Menu tab. When you are done, choose how to pay.')}</p><div class="row"><button class="btn teal" data-act="paycash">${L('Pay cash')}</button><button class="btn teal" data-act="payonline">${L('Pay online')}</button></div></div>`;
       }
     } else if (claimedList.length) {
       pay = `<div class="pay"><h3><span>${L('Payment')}</span><span>${rupee(sum(claimedList, o => o.total))}</span></h3><p>${L('The counter will check your payment. Your bill is ready: tap View bill.')}</p></div>`;
@@ -1831,6 +1832,7 @@ function customerView(tableNo) {
     changenum: () => { S.phone = ''; S.draft = ''; ls.set('vfe_phone', ''); S.orders = []; S.loaded = false; S.err = ''; S.sig = ''; renderOrders(true); },
     paycash: async () => { await payDo('cash'); toast(tt('Counter has been told', 'काउंटर को बता दिया गया है')); },
     payonline: () => payDo('online'),
+    rzcheck: async () => { toast(tt('Checking your payment…', 'आपका पेमेंट जाँच रहे हैं…')); await rzRecover(true); await refreshOrders(true); },
     rzpay: async () => {
       const btn = $('#rzbtn'); if (btn) btn.disabled = true;
       const fail = m => { toast(m || tt('Could not start the payment. Please try again.', 'पेमेंट शुरू नहीं हो पाया। कृपया फिर कोशिश करें।'), true); if (btn) btn.disabled = false; };
