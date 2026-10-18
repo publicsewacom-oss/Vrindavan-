@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="app-build" content="29">
+<meta name="app-build" content="30">
 <meta name="theme-color" content="#0F3D38">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Vrindavan Food Enterprise</title>
@@ -855,7 +855,7 @@ const mem = { orders: [], calls: [], ratings: [] };
 const dRead = k => ls.get('vfe_' + k) || mem[k];
 const dWrite = (k, v) => { mem[k] = v; ls.set('vfe_' + k, v); };
 
-const APP_BUILD = '29';
+const APP_BUILD = '30';
 // naya version GitHub par aaya ho to khuli screen par laal patti dikhao
 async function checkUpdate() {
   try {
@@ -1613,7 +1613,7 @@ function customerView(tableNo) {
         pay = `<div class="pay"><h3><span>${L('Payment')}</span><span>${rupee(amt)}</span></h3><p>${bi(`Please pay ${rupee(amt)} in cash at the counter. Staff has been told.`, `कृपया काउंटर पर ${rupee(amt)} नकद दें। स्टाफ़ को बता दिया गया है।`)}</p><div class="row"><button class="btn line" data-act="changepay">${L('Change method')}</button></div></div>`;
       } else if (method === 'online') {
         S.qr = { amt, tbl };
-        pay = `<div class="pay"><h3><span>${L('Pay online')}</span><span>${rupee(amt)}</span></h3><div class="upi"><div id="upiqr"></div><p class="ds">${bi(`Scan with any UPI app, then enter ${rupee(amt)} and pay`, `किसी भी UPI ऐप से स्कैन करें, फिर ${rupee(amt)} खुद डालकर पे करें`)}</p><p class="upiid">UPI ID: ${esc(CONFIG.UPI_ID)}</p><a class="btn teal sm" href="${upiLink(amt, tbl)}">${L('Open UPI app')}</a></div>
+        pay = `<div class="pay"><h3><span>${L('Pay online')}</span><span>${rupee(amt)}</span></h3>${DEMO ? '' : `<button class="btn gold" id="rzbtn" data-act="rzpay" style="width:100%;font-size:18px;padding:14px">💳 ${bi('Pay ' + rupee(amt) + ' now (UPI / Card)', rupee(amt) + ' अभी पे करें (UPI / कार्ड)')}</button><p class="ds" style="text-align:center;font-size:13px">${bi('The amount is filled in for you. Your bill is ready as soon as the payment succeeds.', 'राशि अपने-आप भरी आएगी। पेमेंट होते ही आपका बिल तैयार हो जाएगा।')}</p><p class="ds" style="text-align:center;margin-top:12px;font-weight:700">${bi('Or pay by scanning / typing the UPI ID', 'या QR स्कैन करके / UPI ID डालकर पे करें')}</p>`}<div class="upi"><div id="upiqr"></div><p class="ds">${bi(`Scan with any UPI app, then enter ${rupee(amt)} and pay`, `किसी भी UPI ऐप से स्कैन करें, फिर ${rupee(amt)} खुद डालकर पे करें`)}</p><p class="upiid">UPI ID: ${esc(CONFIG.UPI_ID)}</p><a class="btn teal sm" href="${upiLink(amt, tbl)}">${L('Open UPI app')}</a></div>
           <p class="ds" style="text-align:center;font-size:13px;color:#8a5a00">${bi('Pay from your bank savings account (not a credit card, wallet or overdraft).', 'पेमेंट अपने बैंक के बचत खाते से करें (क्रेडिट कार्ड, वॉलेट या ओवरड्राफ्ट से नहीं)।')}</p>
           <p class="ds" style="margin-top:10px">${L('After paying, tap the button below.')}</p>
           <div class="row"><button class="btn gold" data-act="paid">${L('I have paid online')}</button><button class="btn line" data-act="changepay">${L('Change method')}</button></div></div>`;
@@ -1665,6 +1665,7 @@ function customerView(tableNo) {
 
   async function refreshOrders(force) {
     if (!S.phone) return;
+    rzRecover();
     try {
       S.orders = await store.myOrders(S.phone);
       S.fail = false;
@@ -1740,6 +1741,38 @@ function customerView(tableNo) {
     document.addEventListener('visibilitychange', () => { if (!document.hidden) checkWaiter(); });
   }
 
+  const loadRzp = () => new Promise((ok, no) => {
+    if (window.Razorpay) return ok();
+    const sc = document.createElement('script'); sc.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    sc.onload = ok; sc.onerror = () => no(new Error('razorpay script')); document.head.appendChild(sc);
+  });
+  // payment ke baad: server se jaanch karwao (signature ke saath), phir bill dikhao
+  const rzVerify = async r => {
+    try {
+      const { data, error } = await sb.functions.invoke('rzp-verify', { body: { order_id: r.razorpay_order_id, payment_id: r.razorpay_payment_id, signature: r.razorpay_signature } });
+      if (error || !data || !data.ok) throw error || new Error('not verified');
+      ls.set('vfe_rzp', null);
+      toast(tt('Payment received. Thank you!', 'पेमेंट मिल गया। धन्यवाद!'));
+      await refreshOrders(true); S.screen = 'bill'; showScreen(); window.scrollTo(0, 0);
+    } catch (e) {
+      console.error(e);
+      toast(tt('Payment is being confirmed. Please wait a moment…', 'पेमेंट की पुष्टि हो रही है। कृपया थोड़ी देर रुकें…'));
+      setTimeout(() => rzRecover(true), 4000);
+    }
+  };
+  // page band/refresh ho gaya ho to bhi: pichla Razorpay order Razorpay se poochh lo
+  var rzBusy = false;
+  async function rzRecover(force) {
+    if (DEMO || rzBusy) return;
+    const p = ls.get('vfe_rzp'); if (!p || !p.id || Date.now() - p.t > 3 * 3600 * 1000) { if (p) ls.set('vfe_rzp', null); return; }
+    if (!force && p.last && Date.now() - p.last < 15000) return;
+    p.last = Date.now(); ls.set('vfe_rzp', p); rzBusy = true;
+    try {
+      const { data } = await sb.functions.invoke('rzp-verify', { body: { order_id: p.id } });
+      if (data && data.ok) { ls.set('vfe_rzp', null); toast(tt('Payment received. Thank you!', 'पेमेंट मिल गया। धन्यवाद!')); await refreshOrders(true); }
+    } catch (e) { console.error(e); }
+    rzBusy = false;
+  }
   const payDo = async action => {
     try { await store.payAction(S.phone, action); }
     catch (e) { console.error(e); toast(tt('Something went wrong. Please try again.', 'कुछ गड़बड़ हुई। कृपया फिर कोशिश करें।'), true); }
@@ -1798,6 +1831,26 @@ function customerView(tableNo) {
     changenum: () => { S.phone = ''; S.draft = ''; ls.set('vfe_phone', ''); S.orders = []; S.loaded = false; S.err = ''; S.sig = ''; renderOrders(true); },
     paycash: async () => { await payDo('cash'); toast(tt('Counter has been told', 'काउंटर को बता दिया गया है')); },
     payonline: () => payDo('online'),
+    rzpay: async () => {
+      const btn = $('#rzbtn'); if (btn) btn.disabled = true;
+      const fail = m => { toast(m || tt('Could not start the payment. Please try again.', 'पेमेंट शुरू नहीं हो पाया। कृपया फिर कोशिश करें।'), true); if (btn) btn.disabled = false; };
+      try {
+        const { data, error } = await sb.functions.invoke('rzp-create', { body: { phone: S.phone } });
+        if (error || !data || !data.order_id) { console.error(error, data); return fail(); }
+        await loadRzp();
+        ls.set('vfe_rzp', { id: data.order_id, t: Date.now() });
+        const rz = new window.Razorpay({
+          key: data.key_id, amount: data.amount, currency: 'INR', order_id: data.order_id,
+          name: CONFIG.NAME, description: 'Table ' + data.table,
+          prefill: { name: S.cname || ls.get('vfe_name') || '', contact: '+91' + S.phone },
+          theme: { color: '#0F3D3A' },
+          handler: r => { rzVerify(r); },
+          modal: { ondismiss: () => { if (btn) btn.disabled = false; } }
+        });
+        rz.on('payment.failed', () => { toast(tt('Payment failed. You can try again.', 'पेमेंट नहीं हो पाया। आप फिर कोशिश कर सकते हैं।'), true); if (btn) btn.disabled = false; });
+        rz.open();
+      } catch (e) { console.error(e); fail(); }
+    },
     copyupi: async () => {
       const v = CONFIG.UPI_ID; let ok = false;
       try { await navigator.clipboard.writeText(v); ok = true; } catch (e) {}
