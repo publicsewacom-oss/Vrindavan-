@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="app-build" content="34">
+<meta name="app-build" content="35">
 <meta name="theme-color" content="#052A31">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Vrindavan Food Enterprise</title>
@@ -581,6 +581,79 @@ body:has(.ownerhome){min-height:100vh;background:var(--bg)}
 .ownerhome .btn.line{border-color:var(--pri);color:var(--pri)}
 .ownerhome .btn.sm{margin:0 6px 8px 0;padding:10px 16px}
 .ownerhome .hgrid a{background:#fff;border:1px solid var(--line);border-radius:10px;color:var(--pri);font-weight:700;font-size:15px;padding:12px 4px}
+
+/* ===== v35 premium finish (refined layer over the clean base) ===== */
+:root{--gold-line:linear-gradient(90deg,rgba(184,134,43,0),#B8862B 18%,#E3C77A 50%,#B8862B 82%,rgba(184,134,43,0));--e1:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.08);--e2:0 2px 4px rgba(16,24,40,.05),0 8px 20px rgba(16,24,40,.08);--e3:0 4px 8px rgba(16,24,40,.06),0 18px 40px rgba(16,24,40,.14)}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+body{background:#F4F5F7;font-feature-settings:"tnum" 1,"lnum" 1;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+.pr,.vl b,.tot b,.cb b,.amtbig b,.oc h3 b{font-variant-numeric:tabular-nums}
+/* header: deep maroon with fine gold rule */
+.top{background:linear-gradient(180deg,#9A1A42 0%,#7E1232 100%);padding:15px 16px 16px}
+.top::after{content:"";position:absolute;left:0;right:0;bottom:0;height:2px;background:var(--gold-line)}
+.brand{letter-spacing:.005em}
+.sub{color:rgba(255,255,255,.78);letter-spacing:.02em}
+.top img,.top .logo{box-shadow:0 0 0 2px rgba(255,255,255,.95),0 0 0 3px rgba(184,134,43,.9),0 4px 10px rgba(0,0,0,.25)}
+.tbadge{box-shadow:var(--e1),0 0 0 1px rgba(184,134,43,.55)}
+/* cards: layered depth, softer radius */
+.cust .oc,.cust .pay,.cust .rcard,.cust .stampc,.tk{border:1px solid #E6E8EC;border-radius:14px;box-shadow:var(--e1)}
+.cust .oc,.cust .pay,.cust .rcard,.cust .stampc{margin-left:12px;margin-right:12px}
+.item2{transition:background .15s}
+.item2:active{background:#FAFAFB}
+.pic{border-radius:12px;box-shadow:0 2px 8px rgba(16,24,40,.16)}
+.cust .nm{font-weight:650}
+.add{transition:background .15s,color .15s,transform .08s,box-shadow .15s;box-shadow:0 1px 2px rgba(16,24,40,.06)}
+.add:hover{background:var(--pri);color:#fff}
+button:active,.btn:active,.add:active,.chip:active,.bigbtn:active{transform:scale(.97)}
+.btn{transition:transform .08s,box-shadow .15s,filter .15s}
+.btn.gold,.btn.teal{background:linear-gradient(180deg,#951A40,#7D1232);box-shadow:0 1px 0 rgba(255,255,255,.18) inset,0 2px 6px rgba(138,21,56,.28)}
+.btn.gold:hover,.btn.teal:hover{filter:brightness(1.06)}
+.btn.line{box-shadow:none}
+/* category chips + tabs */
+.chip{transition:all .15s}
+.chip.on{box-shadow:0 2px 6px rgba(138,21,56,.28)}
+.bar{box-shadow:0 1px 0 #E6E8EC,0 6px 16px rgba(16,24,40,.05)}
+.bar .tab{transition:color .15s}
+/* floating cart bar */
+.cb{left:10px;right:10px;bottom:10px;border-radius:16px;background:linear-gradient(180deg,#951A40,#78112F);box-shadow:var(--e3),0 0 0 1px rgba(184,134,43,.5);animation:rise .28s cubic-bezier(.2,.8,.2,1)}
+.cb .btn{background:#fff!important;color:var(--pri)!important;border-radius:10px;padding:10px 16px;font-weight:800;box-shadow:none;width:auto}
+/* bottom sheet */
+.sheet{box-shadow:0 -12px 40px rgba(16,24,40,.28);animation:sheetup .3s cubic-bezier(.2,.8,.2,1)}
+.sheet::before{content:"";display:block;width:40px;height:4px;border-radius:4px;background:#D0D5DD;margin:8px auto 0}
+.scrim{animation:fadein .2s;backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)}
+/* inputs */
+.tkin,.fl textarea,.rtext{padding:12px 14px;font-size:16px;transition:border-color .15s,box-shadow .15s}
+/* home */
+.bigbtn{background:linear-gradient(180deg,#9A1A42,#74102D);box-shadow:var(--e2),0 0 0 1px rgba(184,134,43,.55);position:relative}
+.bigbtn::after{content:"";position:absolute;left:18px;right:18px;bottom:8px;height:1px;background:var(--gold-line);opacity:.9}
+.midbtn{box-shadow:var(--e1);border-radius:14px}
+/* amount + steps + status */
+.amtbig{background:#fff;border:1px solid #E6E8EC;box-shadow:var(--e1);border-top:3px solid var(--pri)}
+.steps span.on{box-shadow:0 2px 6px rgba(138,21,56,.25)}
+.stampc{background:linear-gradient(180deg,#fff,#FFFCF6)!important;border-color:#EBD9A9!important}
+.stampc .sh span{background:var(--acc-t);color:#8A6212}
+.stg i.on{background:linear-gradient(180deg,#9A1A42,#74102D);box-shadow:0 2px 5px rgba(138,21,56,.3);animation:pop .35s cubic-bezier(.3,1.5,.5,1) both}
+.rcard.rdone{animation:pop .35s both}
+.star{transition:transform .12s,color .12s}
+.star:not(.on){color:#B0B7C3}
+.star.on{filter:drop-shadow(0 2px 3px rgba(245,164,0,.45))}
+/* screens fade in */
+.cust section,.cust>div[id^=v-]{animation:fadein .25s ease both}
+/* skeleton loader look for "Loading" */
+.cust .empty{padding:40px 16px}
+/* counter / admin */
+.cn-top{background:linear-gradient(180deg,#9A1A42,#7E1232);position:relative}
+.cn-top::after{content:"";position:absolute;left:0;right:0;bottom:0;height:2px;background:var(--gold-line)}
+.tcard,.oc2,.stat,.tbl,.adm .card,.qcard{box-shadow:var(--e1);border-radius:12px}
+.tcard{transition:box-shadow .15s,transform .1s}
+.tcard:hover{box-shadow:var(--e2)}
+.login{box-shadow:var(--e3)}
+#splash .dr::after{border-color:rgba(227,199,122,.55)}
+@keyframes rise{from{transform:translateY(24px);opacity:0}to{transform:none;opacity:1}}
+@keyframes sheetup{from{transform:translateY(40px);opacity:.6}to{transform:none;opacity:1}}
+@keyframes fadein{from{opacity:0}to{opacity:1}}
+@keyframes pop{0%{transform:scale(.6);opacity:0}100%{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+@media print{.cb,.sheet::before{display:none}}
 </style>
 </head>
 <body>
@@ -1041,7 +1114,7 @@ const mem = { orders: [], calls: [], ratings: [] };
 const dRead = k => ls.get('vfe_' + k) || mem[k];
 const dWrite = (k, v) => { mem[k] = v; ls.set('vfe_' + k, v); };
 
-const APP_BUILD = '34';
+const APP_BUILD = '35';
 // naya version GitHub par aaya ho to khuli screen par laal patti dikhao
 async function checkUpdate() {
   try {
