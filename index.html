@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="app-build" content="35">
+<meta name="app-build" content="36">
 <meta name="theme-color" content="#052A31">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Vrindavan Food Enterprise</title>
@@ -654,6 +654,32 @@ button:active,.btn:active,.add:active,.chip:active,.bigbtn:active{transform:scal
 @keyframes pop{0%{transform:scale(.6);opacity:0}100%{transform:none;opacity:1}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 @media print{.cb,.sheet::before{display:none}}
+
+/* ===== checkout page (online payment) ===== */
+:root{--pri-rgb:138,21,56;--pri-hi:#9A1A42;--pri-lo:#7E1232}
+.pay.co{padding:0;overflow:hidden}
+.co-top{background:linear-gradient(180deg,var(--pri-hi),var(--pri-lo));color:#fff;text-align:center;padding:22px 16px 20px;position:relative}
+.co-top::after{content:"";position:absolute;left:0;right:0;bottom:0;height:2px;background:linear-gradient(90deg,transparent,#B8862B 20%,#E3C77A 50%,#B8862B 80%,transparent)}
+.co-top small{display:block;font-size:13px;letter-spacing:.06em;text-transform:uppercase;opacity:.85;font-weight:600}
+.co-top b{display:block;font-size:44px;font-weight:800;line-height:1.15;margin:4px 0 2px;font-variant-numeric:tabular-nums}
+.co-top span{font-size:14px;opacity:.9}
+.co-sum,.co-how{padding:14px 16px;border-bottom:1px solid var(--line)}
+.co h4{font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);margin-bottom:8px;font-weight:700}
+.co-sum ul{list-style:none;padding:0}
+.co-sum li{display:flex;justify-content:space-between;gap:12px;padding:6px 0;font-size:15px}
+.co-sum li b{font-variant-numeric:tabular-nums;font-weight:600}
+.co-tot{display:flex;justify-content:space-between;border-top:1px dashed #D0D5DD;margin-top:6px;padding-top:10px;font-size:17px;font-weight:800}
+.co-m{display:flex;gap:12px;align-items:center;padding:9px 0}
+.co-m+.co-m{border-top:1px solid #F0F1F4}
+.co-m i{flex:none;width:38px;height:38px;border-radius:10px;background:var(--pri-t);display:flex;align-items:center;justify-content:center;font-style:normal;font-size:19px;color:var(--pri)}
+.co-m b{display:block;font-size:15px}.co-m small{color:var(--mute);font-size:12.5px}
+.co-sec{padding:12px 16px 4px;font-size:12.5px;color:var(--mute);text-align:center}
+.pay.co .row{padding:8px 16px 16px}
+.paybar{position:fixed;left:0;right:0;bottom:0;z-index:20;max-width:560px;margin:0 auto;background:#fff;border-top:1px solid var(--line);box-shadow:0 -6px 20px rgba(16,24,40,.12);display:flex;align-items:center;gap:14px;padding:10px 14px calc(10px + env(safe-area-inset-bottom))}
+.paybar small{display:block;font-size:12px;color:var(--mute);font-weight:600}
+.paybar b{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums}
+.paynow{flex:1;background:linear-gradient(180deg,var(--pri-hi),var(--pri-lo));color:#fff;border-radius:12px;padding:15px 18px;font-size:18px;font-weight:800;display:flex;justify-content:center;align-items:center;gap:8px;box-shadow:0 2px 8px rgba(var(--pri-rgb),.35)}
+.paynow span{font-size:24px;line-height:1}
 </style>
 </head>
 <body>
@@ -1114,7 +1140,7 @@ const mem = { orders: [], calls: [], ratings: [] };
 const dRead = k => ls.get('vfe_' + k) || mem[k];
 const dWrite = (k, v) => { mem[k] = v; ls.set('vfe_' + k, v); };
 
-const APP_BUILD = '35';
+const APP_BUILD = '36';
 // naya version GitHub par aaya ho to khuli screen par laal patti dikhao
 async function checkUpdate() {
   try {
@@ -1911,12 +1937,23 @@ function customerView(tableNo) {
       } else if (method === 'cash') {
         pay = `<div class="pay"><h3><span>${L('Payment')}</span><span>${rupee(amt)}</span></h3><p>${bi(`Please pay ${rupee(amt)} in cash at the counter. Staff has been told.`, `कृपया काउंटर पर ${rupee(amt)} नकद दें। स्टाफ़ को बता दिया गया है।`)}</p><div class="row"><button class="btn line" data-act="changepay">${L('Change method')}</button></div></div>`;
       } else if (method === 'online') {
-        pay = `<div class="pay"><h3><span>${L('Pay online')}</span><span>${rupee(amt)}</span></h3>
-          <div class="amtbig"><small>${bi('Amount to pay', 'आपको कितना पे करना है')}</small><b>${rupee(amt)}</b></div>
-          ${DEMO ? `<p class="ds" style="text-align:center">${bi('Online payment works only on the live site.', 'ऑनलाइन पेमेंट सिर्फ़ लाइव साइट पर चलता है।')}</p>` : `<button class="btn gold" id="rzbtn" data-act="rzpay" style="width:100%;font-size:19px;padding:15px">🔒 ${bi('Pay ' + rupee(amt) + ' securely', rupee(amt) + ' सुरक्षित रूप से पे करें')}</button>
-          <p class="ds" style="text-align:center;font-size:13px;margin-top:8px">${bi('UPI apps · UPI QR · Debit card · Credit card · Net banking. The amount is filled in for you.', 'UPI ऐप · UPI QR · डेबिट कार्ड · क्रेडिट कार्ड · नेट बैंकिंग। राशि अपने-आप भरी आएगी।')}</p>
-          <p class="ds" style="text-align:center;font-size:12px">${bi('Powered by Razorpay. Your bill is ready as soon as the payment succeeds.', 'Razorpay द्वारा सुरक्षित। पेमेंट होते ही आपका बिल तैयार हो जाएगा।')}</p>`}
-          <div class="row"><button class="btn line" data-act="rzcheck">${bi('Paid but no bill? Check', 'पेमेंट कर दिया पर बिल नहीं आया? जाँचें')}</button><button class="btn line" data-act="changepay">${L('Change method')}</button></div></div>`;
+        const agg = {};
+        open.forEach(o => (o.items || []).forEach(it => { const k = it.id || it.name; (agg[k] = agg[k] || { name: it.name, qty: 0, amt: 0, id: it.id }); agg[k].qty += +it.qty; agg[k].amt += +it.qty * +it.price; }));
+        const rows = Object.values(agg).map(r => `<li><span>${r.qty} × ${bi(r.name, SKU_HI[r.id] || r.name)}</span><b>${rupee(r.amt)}</b></li>`).join('');
+        pay = `<div class="pay co">
+          <div class="co-top"><small>${bi('Amount payable', 'देय राशि')}</small><b>${rupee(amt)}</b><span>${bi('Table ' + tbl, 'टेबल ' + tbl)} · ${esc(who)}</span></div>
+          <div class="co-sum"><h4>${bi('Bill summary', 'बिल का ब्यौरा')}</h4><ul>${rows}</ul><div class="co-tot"><span>${bi('Total', 'कुल')}</span><b>${rupee(amt)}</b></div></div>
+          <div class="co-how"><h4>${bi('Pay with', 'इनसे पेमेंट करें')}</h4>
+            <div class="co-m"><i>📱</i><div><b>${bi('UPI apps', 'UPI ऐप')}</b><small>PhonePe · Google Pay · Paytm · BHIM</small></div></div>
+            <div class="co-m"><i>▦</i><div><b>${bi('UPI QR code', 'UPI QR कोड')}</b><small>${bi('Scan with any UPI app', 'किसी भी UPI ऐप से स्कैन करें')}</small></div></div>
+            <div class="co-m"><i>💳</i><div><b>${bi('Debit / Credit card', 'डेबिट / क्रेडिट कार्ड')}</b><small>Visa · Mastercard · RuPay</small></div></div>
+            <div class="co-m"><i>🏦</i><div><b>${bi('Net banking', 'नेट बैंकिंग')}</b><small>${bi('All major banks', 'सभी प्रमुख बैंक')}</small></div></div>
+          </div>
+          ${DEMO ? `<p class="ds" style="text-align:center">${bi('Online payment works only on the live site.', 'ऑनलाइन पेमेंट सिर्फ़ लाइव साइट पर चलता है।')}</p>` : ''}
+          <p class="co-sec">🔒 ${bi('100% secure payment by Razorpay. Your bill is ready as soon as the payment succeeds.', 'Razorpay द्वारा 100% सुरक्षित पेमेंट। पेमेंट होते ही आपका बिल तैयार हो जाएगा।')}</p>
+          <div class="row"><button class="btn line" data-act="rzcheck">${bi('Paid but no bill? Check', 'पेमेंट कर दिया पर बिल नहीं आया? जाँचें')}</button><button class="btn line" data-act="changepay">${L('Change method')}</button></div>
+          ${DEMO ? '' : `<div class="paybar"><div><small>${bi('Total', 'कुल')}</small><b>${rupee(amt)}</b></div><button class="paynow" id="rzbtn" data-act="rzpay">${bi('Pay now', 'अभी पे करें')} <span>›</span></button></div>`}
+        </div>`;
       } else {
         pay = `<div class="pay"><h3><span>${L('Bill so far')}</span><span>${rupee(amt)}</span></h3><p class="ds">${L('Want something more? Order again from the Menu tab. When you are done, choose how to pay.')}</p><div class="row"><button class="btn teal" data-act="paycash">${L('Pay cash')}</button><button class="btn teal" data-act="payonline">${L('Pay online')}</button></div></div>`;
       }
@@ -2148,7 +2185,8 @@ function customerView(tableNo) {
           key: data.key_id, amount: data.amount, currency: 'INR', order_id: data.order_id,
           name: CONFIG.NAME, description: 'Table ' + data.table,
           prefill: { name: S.cname || ls.get('vfe_name') || '', contact: '+91' + S.phone },
-          theme: { color: '#0F3D3A' },
+          theme: { color: getComputedStyle(document.documentElement).getPropertyValue('--pri').trim() || '#8A1538' },
+          config: { display: { blocks: { upi: { name: 'UPI apps / QR', instruments: [{ method: 'upi' }] }, card: { name: 'Debit / Credit card', instruments: [{ method: 'card' }] } }, sequence: ['block.upi', 'block.card'], preferences: { show_default_blocks: true } } },
           handler: r => { rzVerify(r); },
           modal: { ondismiss: () => { if (btn) btn.disabled = false; } }
         });
