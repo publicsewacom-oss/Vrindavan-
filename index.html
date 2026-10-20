@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="app-build" content="36">
+<meta name="app-build" content="37">
 <meta name="theme-color" content="#052A31">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Vrindavan Food Enterprise</title>
@@ -680,6 +680,35 @@ button:active,.btn:active,.add:active,.chip:active,.bigbtn:active{transform:scal
 .paybar b{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums}
 .paynow{flex:1;background:linear-gradient(180deg,var(--pri-hi),var(--pri-lo));color:#fff;border-radius:12px;padding:15px 18px;font-size:18px;font-weight:800;display:flex;justify-content:center;align-items:center;gap:8px;box-shadow:0 2px 8px rgba(var(--pri-rgb),.35)}
 .paynow span{font-size:24px;line-height:1}
+
+/* thermal customer bill */
+.sl2{font-family:'Inter','Noto Sans Devanagari',Arial,sans-serif;font-size:12.5px;line-height:1.35;color:#000}
+.sl2 .s2n{text-align:center;font-weight:800;font-size:18px;margin:2px 0}
+.sl2 .s2t{text-align:center;font-weight:700;letter-spacing:.2em;font-size:12px;border-top:2px solid #000;border-bottom:2px solid #000;padding:3px 0;margin:6px 0}
+.sl2 .s2m{display:flex;justify-content:space-between;gap:8px;padding:2px 0;border-bottom:1px dotted #000}
+.sl2 .s2m span{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.05em}
+.sl2 .s2m b{font-weight:700;font-size:12.5px}
+.sl2 .s2m div:last-child:not(:first-child){text-align:right}
+.sl2 .s2h{display:flex;font-weight:800;font-size:10.5px;letter-spacing:.06em;border-top:2px solid #000;border-bottom:1px solid #000;margin-top:8px;padding:3px 0}
+.sl2 .s2h span:nth-child(1),.sl2 .s2r .a{flex:1}.sl2 .s2h span:nth-child(2),.sl2 .s2r .q{width:30px;text-align:center}.sl2 .s2h span:nth-child(3),.sl2 .s2r .p{width:62px;text-align:right}
+.sl2 .s2r{display:flex;padding:4px 0;border-bottom:1px dotted #000;align-items:flex-start}
+.sl2 .s2r .a{font-weight:600}.sl2 .s2r small{display:block;font-weight:400;font-size:10.5px}
+.sl2 .s2r .p{font-weight:700}
+.sl2 .s2tot{display:flex;justify-content:space-between;font-weight:800;font-size:19px;border-top:2px solid #000;border-bottom:2px solid #000;margin-top:6px;padding:5px 0}
+.sl2 .s2st{text-align:center;font-weight:800;font-size:15px;letter-spacing:.08em;border:2px solid #000;margin:8px 0 4px;padding:5px}
+.sl2 .s2st.ok{background:#000;color:#fff}
+.sl2 .s2c{text-align:center;font-size:11.5px}
+.sl2 .s2f{text-align:center;font-size:11.5px;margin-top:8px;border-top:1px dashed #000;padding-top:6px}
+
+.stob{margin:8px 12px;padding:10px 12px;border-radius:10px;font-size:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.stob.warn{background:#FFF6E0;color:#8A5A00;border:1px solid #E0B24A}.stob.high{background:#FDEDE3;color:#9A3B00;border:1px solid #F2A365}.stob.crit{background:#FDECEA;color:#B42318;border:1px solid #F1A19A}
+.stob button{border:1.5px solid currentColor;border-radius:8px;padding:4px 10px;font-weight:700;color:inherit}
+.gauge{position:relative;height:16px;background:#EEF0F3;border-radius:99px;overflow:hidden}
+.gauge .gf{height:100%;border-radius:99px;transition:width .4s}.gf.ok{background:#1B8A4B}.gf.warn{background:#E0A800}.gf.high{background:#E8710A}.gf.crit{background:#D92D20}
+.gauge i{position:absolute;top:0;bottom:0;width:2px;background:rgba(0,0,0,.35)}
+.stb{display:inline-block;border-radius:99px;padding:2px 10px;font-size:12px;font-weight:700;margin-left:6px}.stb.ok{background:#E8F5EE;color:#146C3A}.stb.warn{background:#FFF6E0;color:#8A5A00}.stb.high{background:#FDEDE3;color:#9A3B00}.stb.crit{background:#FDECEA;color:#B42318}
+.adm .mini.sel{background:var(--teal);color:#fff;border-color:var(--teal)}
+.adm .card h2{font-weight:700}.sto details{margin:8px 0}.sto summary{cursor:pointer;font-weight:600;font-size:14px}
 </style>
 </head>
 <body>
@@ -1140,7 +1169,7 @@ const mem = { orders: [], calls: [], ratings: [] };
 const dRead = k => ls.get('vfe_' + k) || mem[k];
 const dWrite = (k, v) => { mem[k] = v; ls.set('vfe_' + k, v); };
 
-const APP_BUILD = '36';
+const APP_BUILD = '37';
 // naya version GitHub par aaya ho to khuli screen par laal patti dikhao
 async function checkUpdate() {
   try {
@@ -1565,6 +1594,7 @@ function billInfo(list) {
     lines, total: sum(lines, i => i.price * i.qty),
     paidAmt: sum(paid, o => o.total),
     nums: list.map(o => '#' + o.num).join(', '),
+    cname: ((list.find(o => o.cname) || {}).cname || '').trim(),
     tables: [...new Set(list.map(o => o.table_no))].join(', '),
     orderedAt: list.map(o => o.created_at).sort()[0],
     readyAt: last('ready_at'), paidAt: paid.length && !open.length && !claimed.length ? last('paid_at') : null,
@@ -1572,48 +1602,75 @@ function billInfo(list) {
     state: open.length ? ((paid.length || claimed.length) ? 'partial' : 'unpaid') : claimed.length ? 'claimed' : 'paid'
   };
 }
+const bdate = iso => new Date(iso).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' });
 function slipReceipt(list, phone) {
   const b = billInfo(list);
-  const stat = { paid: 'PAID', claimed: 'PAYMENT CHECK PENDING', unpaid: 'PAYMENT PENDING', partial: 'PARTLY PAID' }[b.state];
-  return `<div class="sl">${CONFIG.LOGO ? `<img class="lg" src="${CONFIG.LOGO}" alt="">` : ''}<div class="sc b">${esc(CONFIG.NAME)}</div><div class="sc b">BILL</div>
-  <div class="sc">Table ${esc(b.tables)} · Mobile ${maskPhone(phone)}</div><div class="sc">Orders ${esc(b.nums)}</div><hr>
-  <div class="sr"><span>First order</span><span>${fdt(b.orderedAt)}</span></div>
-  ${b.readyAt ? `<div class="sr"><span>Food ready</span><span>${fdt(b.readyAt)}</span></div>` : ''}
-  ${b.paidAt ? `<div class="sr"><span>Paid</span><span>${fdt(b.paidAt)}</span></div>` : ''}<hr>
-  ${b.lines.map(i => `<div class="sr"><span>${i.qty} x ${esc(i.name)} @${i.price}</span><span>${i.price * i.qty}</span></div>`).join('')}
-  <hr><div class="sr"><b>TOTAL</b><b>Rs ${b.total}</b></div><div class="sc b">${stat}</div>
-  ${b.method ? `<div class="sr"><span>Method</span><span>${b.method}</span></div>` : ''}<hr>
-  <div class="sc">Thank you! Visit again.</div></div>`;
+  const stat = { paid: 'PAID  ✓', claimed: 'PAYMENT CHECK PENDING', unpaid: 'PAYMENT PENDING', partial: 'PARTLY PAID' }[b.state];
+  const when = b.paidAt || b.orderedAt;
+  return `<div class="sl sl2">${CONFIG.LOGO ? `<img class="lg" src="${CONFIG.LOGO}" alt="">` : ''}
+  <div class="s2n">${esc(CONFIG.NAME)}</div>
+  <div class="s2t">BILL · बिल</div>
+  <div class="s2m"><div><span>Bill no.</span><b>${esc(b.nums)}</b></div><div><span>Table</span><b>${esc(b.tables)}</b></div></div>
+  <div class="s2m"><div><span>Date</span><b>${bdate(when)}</b></div></div>
+  ${b.cname ? `<div class="s2m"><div><span>Customer</span><b>${esc(b.cname)}</b></div><div><span>Mobile</span><b>${maskPhone(phone)}</b></div></div>` : `<div class="s2m"><div><span>Mobile</span><b>${maskPhone(phone)}</b></div></div>`}
+  <div class="s2h"><span>ITEM</span><span>QTY</span><span>AMOUNT</span></div>
+  ${b.lines.map(i => `<div class="s2r"><span class="a">${esc(i.name)}${SKU_HI[i.id] ? `<small>${esc(SKU_HI[i.id])}</small>` : ''}<small>@ Rs ${i.price}</small></span><span class="q">${i.qty}</span><span class="p">${i.price * i.qty}</span></div>`).join('')}
+  <div class="s2tot"><span>TOTAL</span><span>Rs ${b.total}</span></div>
+  <div class="s2st ${b.state === 'paid' ? 'ok' : ''}">${stat}</div>
+  ${b.method ? `<div class="s2c">Paid by: ${b.method}</div>` : ''}
+  <div class="s2f">Thank you! Visit again.<br>धन्यवाद! फिर पधारें।</div></div>`;
 }
 // download wali bill: English aur Hindi dono ek saath (hamesha)
 function billDoc(list, phone) {
   const b = billInfo(list);
-  const stat = {
-    paid: 'PAID ✓ / भुगतान हो गया ✓',
-    claimed: 'Payment check pending / भुगतान की जाँच बाकी है',
-    unpaid: 'Payment pending / भुगतान बाकी है',
-    partial: 'Partly paid / आंशिक भुगतान (' + rupee(b.paidAmt) + ' / ' + rupee(b.total - b.paidAmt) + ')'
-  }[b.state];
-  const row = (a, c) => `<div style="display:flex;justify-content:space-between;gap:10px;margin:3px 0"><span>${a}</span><span>${c}</span></div>`;
-  return `<div style="text-align:center">${CONFIG.LOGO ? `<img src="${CONFIG.LOGO}" style="width:72px;height:72px;object-fit:contain">` : ''}
-    <div style="font-size:23px;font-weight:700;font-family:'Inter','Noto Sans Devanagari',sans-serif;letter-spacing:0">${esc(CONFIG.NAME)}</div><div style="font-size:15px;letter-spacing:.2em;color:#8F6B1E">Bill / बिल</div></div>
-    <div style="border-top:1px dashed #999;margin:10px 0"></div>
-    <div style="font-size:13px;color:#444">
-      ${row('Table / टेबल', esc(b.tables))}${row('Mobile / मोबाइल', maskPhone(phone))}${row('Orders / ऑर्डर', esc(b.nums))}
-      ${row('First order / पहला ऑर्डर', fdt(b.orderedAt))}${b.readyAt ? row('Food ready / खाना तैयार', fdt(b.readyAt)) : ''}${b.paidAt ? row('Paid / भुगतान', fdt(b.paidAt)) : ''}
-    </div>
-    <div style="border-top:1px dashed #999;margin:10px 0"></div>
-    ${b.lines.map(i => `<div style="display:flex;justify-content:space-between;gap:10px;margin:5px 0;font-size:14px"><span>${i.qty} × ${esc(i.name)}${SKU_HI[i.id] ? '<br><span style="color:#555">' + esc(SKU_HI[i.id]) + '</span>' : ''}<br><span style="color:#777;font-size:12px">@${rupee(i.price)}</span></span><b>${rupee(i.price * i.qty)}</b></div>`).join('')}
-    <div style="border-top:2px solid #111;margin:10px 0 6px"></div>
-    <div style="display:flex;justify-content:space-between;font-size:20px;font-weight:700"><span>Total / कुल</span><span>${rupee(b.total)}</span></div>
-    <div style="margin-top:10px;padding:8px;border-radius:8px;background:${b.state === 'paid' ? '#E7F5EC' : '#FFF3CD'};font-weight:700;text-align:center;font-size:14px">${stat}</div>
-    ${b.method ? `<div style="font-size:13px;color:#444;margin-top:6px">Method / तरीका: ${b.method}</div>` : ''}
-    <div style="text-align:center;margin-top:12px;font-size:13px">Thank you! Visit again. / धन्यवाद! फिर पधारें।</div>`;
+  const st = { paid: ['paid', '✓ PAID', 'भुगतान हो गया'], claimed: ['wait', 'PAYMENT CHECK PENDING', 'भुगतान की जाँच बाकी है'], unpaid: ['wait', 'PAYMENT PENDING', 'भुगतान बाकी है'],
+    partial: ['wait', 'PARTLY PAID', 'आंशिक भुगतान · दिया ' + rupee(b.paidAmt) + ' · बाकी ' + rupee(b.total - b.paidAmt)] }[b.state];
+  const when = b.paidAt || b.orderedAt;
+  return `<style>
+  .bd{font-family:'Inter','Noto Sans Devanagari',Arial,sans-serif;color:#1F2430;font-size:13px;line-height:1.4}
+  .bd *{box-sizing:border-box}
+  .bd-h{background:linear-gradient(180deg,var(--pri-hi,#9A1A42),var(--pri-lo,#7E1232));color:#fff;padding:18px 16px 16px;text-align:center;border-radius:10px 10px 0 0}
+  .bd-h img{width:64px;height:64px;object-fit:contain;background:#fff;border-radius:50%;padding:3px;display:block;margin:0 auto 8px}
+  .bd-h b{display:block;font-size:20px;font-weight:700}
+  .bd-h span{display:inline-block;margin-top:6px;font-size:11px;letter-spacing:.18em;font-weight:600;opacity:.9}
+  .bd-g{height:3px;background:linear-gradient(90deg,#B8862B,#E3C77A,#B8862B)}
+  .bd-m{display:flex;flex-wrap:wrap;border:1px solid #E4E7EC;border-top:0}
+  .bd-m div{flex:1 1 50%;padding:8px 12px;border-bottom:1px solid #EEF0F3}
+  .bd-m div:nth-child(odd){border-right:1px solid #EEF0F3}
+  .bd-m small{display:block;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#667085;font-weight:600}
+  .bd-m b{font-weight:600;font-size:13px}
+  .bd-t{width:100%;border-collapse:collapse;margin-top:12px}
+  .bd-t th{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#667085;text-align:left;padding:6px 4px;border-bottom:2px solid #1F2430;font-weight:700}
+  .bd-t th:nth-child(n+2),.bd-t td:nth-child(n+2){text-align:right}
+  .bd-t td{padding:8px 4px;border-bottom:1px solid #EEF0F3;vertical-align:top}
+  .bd-t td small{display:block;color:#667085;font-size:11px}
+  .bd-t td:last-child{font-weight:700;font-variant-numeric:tabular-nums}
+  .bd-tot{display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding:12px;background:#F7F8FA;border-radius:8px;font-size:19px;font-weight:800}
+  .bd-st{margin-top:12px;padding:10px;border-radius:8px;text-align:center;font-weight:800;letter-spacing:.04em}
+  .bd-st.paid{background:#E8F5EE;color:#146C3A;border:1.5px solid #1B8A4B}
+  .bd-st.wait{background:#FFF6E0;color:#8A5A00;border:1.5px solid #E0B24A}
+  .bd-st small{display:block;font-weight:600;font-size:12px;letter-spacing:0;margin-top:2px}
+  .bd-pm{text-align:center;color:#667085;font-size:12px;margin-top:8px}
+  .bd-f{text-align:center;margin-top:14px;padding-top:12px;border-top:1px dashed #C5CAD3;font-size:12.5px;color:#475467}
+  </style><div class="bd">
+  <div class="bd-h">${CONFIG.LOGO ? `<img src="${CONFIG.LOGO}" alt="">` : ''}<b>${esc(CONFIG.NAME)}</b><span>BILL · बिल</span></div><div class="bd-g"></div>
+  <div class="bd-m">
+    <div><small>Bill no. / बिल नं.</small><b>${esc(b.nums)}</b></div><div><small>Table / टेबल</small><b>${esc(b.tables)}</b></div>
+    <div><small>Date / दिनांक</small><b>${bdate(when)}</b></div><div><small>Mobile / मोबाइल</small><b>${maskPhone(phone)}</b></div>
+    ${b.cname ? `<div style="flex-basis:100%;border-right:0"><small>Customer / ग्राहक</small><b>${esc(b.cname)}</b></div>` : ''}
+  </div>
+  <table class="bd-t"><thead><tr><th>Item / आइटम</th><th>Qty</th><th>Rate</th><th>Amount</th></tr></thead><tbody>
+  ${b.lines.map(i => `<tr><td>${esc(i.name)}${SKU_HI[i.id] ? `<small>${esc(SKU_HI[i.id])}</small>` : ''}</td><td>${i.qty}</td><td>${rupee(i.price)}</td><td>${rupee(i.price * i.qty)}</td></tr>`).join('')}
+  </tbody></table>
+  <div class="bd-tot"><span>Total / कुल</span><span>${rupee(b.total)}</span></div>
+  <div class="bd-st ${st[0]}">${st[1]}<small>${st[2]}</small></div>
+  ${b.method ? `<div class="bd-pm">Paid by / तरीका: ${b.method === 'Cash' ? 'Cash / नकद' : b.method}</div>` : ''}
+  <div class="bd-f">Thank you! Visit again.<br>धन्यवाद! फिर पधारें।</div></div>`;
 }
 async function downloadBill(list, phone) {
   if (!list.length) return;
   const host = document.createElement('div');
-  host.style.cssText = 'position:fixed;left:-10000px;top:0;width:380px;background:#fff;color:#111;font-family:Hind,system-ui,sans-serif;padding:18px;line-height:1.35';
+  host.style.cssText = 'position:fixed;left:-10000px;top:0;width:400px;background:#fff;padding:14px';
   host.innerHTML = billDoc(list, phone);
   document.body.appendChild(host);
   const name = 'Bill-' + new Date().toISOString().slice(0, 10);
@@ -2818,7 +2875,7 @@ async function adminView() {
   else { const { data } = await sb.auth.getSession(); authed = !!(data && data.session); }
   if (!authed) { loginScreen(adminView); return; }
 
-  const A = { tab: 'menu', dirty: false, orders: [],
+  const A = { tab: 'menu', dirty: false, orders: [], sto: { data: null, err: '', days: 90, prev: null, busy: false },
     menu: JSON.parse(JSON.stringify(CONFIG.MENU)),
     set: { name: CONFIG.NAME, upi_id: CONFIG.UPI_ID, upi_name: CONFIG.UPI_NAME, tables: CONFIG.TABLES, logo: CONFIG.LOGO || '' } };
   A.menu.forEach(c => c.items.forEach(i => { if (i.img === undefined && PHOTOS[i.id]) i.img = PHOTOS[i.id]; }));
@@ -2866,19 +2923,96 @@ async function adminView() {
   }
   function render() {
     const y = window.scrollY;
-    const tabs = { menu: 'Menu', set: 'Settings', ord: 'Aaj ke orders' };
+    const tabs = { menu: 'Menu', set: 'Settings', ord: 'Aaj ke orders', sto: 'Free plan · जगह' };
     $('#app').innerHTML = `${demoBar()}<div class="adm"><div class="bar"><span class="brand">Admin · ${esc(CONFIG.NAME)}</span>
       ${Object.keys(tabs).map(k => `<button class="${A.tab === k ? 'on' : ''}" data-act="atab" data-v="${k}">${tabs[k]}</button>`).join('')}
       <a href="?counter">Counter</a><a href="?qr">QR</a><button data-act="alogout">Log out</button></div>
-      ${A.tab === 'menu' ? menuTab() : A.tab === 'set' ? setTab() : ordTab()}
-      ${A.tab !== 'ord' ? `<div class="savebar"><span id="adm-dirty" class="mute" style="font-size:13px">${A.dirty ? 'बदलाव सेव नहीं हुए · Unsaved changes' : 'सब सेव है · All saved'}</span><button class="btn teal" id="adm-save" data-act="asave" ${A.dirty ? '' : 'disabled'}>Save / सेव करें</button></div>` : ''}</div>`;
+      ${stoBanner()}${A.tab === 'menu' ? menuTab() : A.tab === 'set' ? setTab() : A.tab === 'sto' ? stoTab() : ordTab()}
+      ${(A.tab !== 'ord' && A.tab !== 'sto') ? `<div class="savebar"><span id="adm-dirty" class="mute" style="font-size:13px">${A.dirty ? 'बदलाव सेव नहीं हुए · Unsaved changes' : 'सब सेव है · All saved'}</span><button class="btn teal" id="adm-save" data-act="asave" ${A.dirty ? '' : 'disabled'}>Save / सेव करें</button></div>` : ''}</div>`;
     window.scrollTo(0, y);
+  }
+  /* ---- free plan: jagah ka hisaab ---- */
+  const DB_LIMIT = 500 * 1024 * 1024;   // Supabase free plan: lagbhag 500 MB (niyam badal sakte hain)
+  const fmtB = b => b >= 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB';
+  function stoCalc() {
+    const d = A.sto.data; if (!d) return null;
+    const pct = d.db_bytes / DB_LIMIT * 100;
+    const lvl = pct >= 90 ? 'crit' : pct >= 80 ? 'high' : pct >= 70 ? 'warn' : 'ok';
+    const dataB = d.tables.filter(t => t.name !== 'settings').reduce((a, t) => a + t.bytes, 0);
+    const age = d.oldest ? Math.max(1, (Date.now() - new Date(d.oldest)) / 86400000) : 0;
+    const perDay = age ? dataB / age : 0;
+    const left = perDay > 0 ? Math.max(0, (DB_LIMIT - d.db_bytes) / perDay) : null;
+    return { pct, lvl, perDay, left, age, dataB };
+  }
+  async function loadUsage() {
+    if (DEMO) { A.sto.err = 'demo'; return; }
+    try { const { data, error } = await sb.rpc('db_usage'); if (error) throw error; A.sto.data = data; A.sto.err = ''; }
+    catch (e) { console.error(e); A.sto.err = String(e.message || e); }
+  }
+  async function rpcPurge(dry) { const { data, error } = await sb.rpc('purge_old', { p_days: A.sto.days, p_dry: dry }); if (error) throw error; return data; }
+  async function exportOldCsv(beforeIso) {
+    const { data, error } = await sb.from('orders').select('*').lt('created_at', beforeIso).order('created_at').limit(20000);
+    if (error) throw error;
+    const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+    const rows = [['order_no', 'date', 'table', 'total', 'pay_status', 'pay_method', 'items']].concat((data || []).map(o => [o.num, o.created_at, o.table_no, o.total, o.pay_status, o.pay_method, (o.items || []).map(i => i.qty + 'x ' + i.name).join(' | ')]));
+    const blob = new Blob(['\ufeff' + rows.map(r => r.map(q).join(',')).join('\n')], { type: 'text/csv' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'purane-orders-' + new Date().toISOString().slice(0, 10) + '.csv'; a.click();
+  }
+  function stoBanner() {
+    const c = stoCalc(); if (!c || c.lvl === 'ok') return '';
+    const msg = { warn: 'जगह ' + c.pct.toFixed(0) + '% भर गई है। सावधान रहें।', high: 'जगह ' + c.pct.toFixed(0) + '% भर गई है! पुराना डेटा हटाइए।', crit: 'जगह ' + c.pct.toFixed(0) + '% भर गई है — अभी पुराना डेटा हटाइए, वरना सिस्टम रुक सकता है।' }[c.lvl];
+    return `<div class="stob ${c.lvl}"><b>⚠ ${msg}</b> <button data-act="atab" data-v="sto">Dekho / देखें</button></div>`;
+  }
+  function stoTab() {
+    const st = A.sto, c = stoCalc();
+    if (st.err === 'demo') return `<div class="card"><h2>Free plan · जगह</h2><p class="mute">यह हिस्सा सिर्फ़ लाइव साइट (Supabase) पर चलता है।</p></div>`;
+    if (!c) return `<div class="card"><h2>Free plan · जगह</h2>${st.err ? `<p style="color:#B42318">नहीं खुला: ${esc(st.err)}<br>शायद STEP9-storage.sql अभी Supabase में नहीं चलाई है।</p>` : '<p class="mute">खुल रहा है…</p>'}<button class="mini" data-act="sload">फिर कोशिश करें</button></div>`;
+    const d = st.data;
+    const lvlTxt = { ok: ['ठीक है', 'सब ठीक चल रहा है'], warn: ['सावधान (70%+)', 'पुराना डेटा हटाने की सोचिए'], high: ['ख़तरा (80%+)', 'अभी पुराना डेटा हटाइए'], crit: ['बहुत ख़तरा (90%+)', 'तुरंत पुराना डेटा हटाइए या Pro plan लीजिए'] }[c.lvl];
+    const fill = c.left == null ? 'डेटा अभी बहुत कम है, अनुमान नहीं निकल सकता।' : c.left > 730 ? 'इस रफ़्तार से भरने में 2 साल से ज़्यादा लगेंगे।' : c.left > 60 ? 'इस रफ़्तार से भरने में लगभग ' + Math.round(c.left / 30) + ' महीने लगेंगे।' : 'इस रफ़्तार से लगभग ' + Math.round(c.left) + ' दिन में भर सकती है।';
+    const chip = (v, cur, act) => `<button class="mini ${cur == v ? 'sel' : ''}" data-act="${act}" data-v="${v}">${v ? v + ' दिन' : 'बंद'}</button>`;
+    const pv = st.prev;
+    return `<div class="card sto"><h2>Free plan: डेटाबेस की जगह</h2>
+      <div class="gauge"><div class="gf ${c.lvl}" style="width:${Math.min(100, c.pct).toFixed(1)}%"></div><i style="left:70%"></i><i style="left:80%"></i></div>
+      <p style="margin-top:8px"><b style="font-size:20px">${fmtB(d.db_bytes)}</b> / ${fmtB(DB_LIMIT)} &nbsp;·&nbsp; <b>${c.pct.toFixed(1)}%</b> <span class="stb ${c.lvl}">${lvlTxt[0]}</span></p>
+      <p class="mute" style="font-size:13px">${lvlTxt[1]}. ${fill}</p>
+      <p class="mute" style="font-size:12.5px">रोज़ लगभग ${fmtB(c.perDay)} नया डेटा (अब तक के हिसाब से)। ${d.oldest ? 'सबसे पुराना ऑर्डर: ' + new Date(d.oldest).toLocaleDateString('en-IN') + '।' : ''} 70% और 80% पर चेतावनी ऊपर दिखेगी।</p>
+      <details><summary>किस चीज़ ने कितनी जगह ली</summary>${d.tables.map(t => `<div class="row" style="justify-content:space-between"><span>${esc(t.name)}</span><b>${fmtB(t.bytes)}</b></div>`).join('')}
+        <p class="mute" style="font-size:12px">ऑर्डर ${d.orders} · वेटर कॉल ${d.calls} · पेमेंट अलर्ट ${d.payments} · रेटिंग ${d.ratings}</p></details>
+      <button class="mini" data-act="sload">🔄 ताज़ा करें</button></div>
+    <div class="card"><h2>पुराना डेटा हटाइए</h2>
+      <p class="mute" style="font-size:13px">इतने दिन से पुराने ऑर्डर, वेटर कॉल और पेमेंट रिकॉर्ड हटेंगे। रेटिंग और स्टांप कार्ड नहीं हटते। हटाने से पहले पुराने ऑर्डर की CSV अपने-आप डाउनलोड होती है (अपने पास रखिए)।</p>
+      <div class="row">${[30, 60, 90, 180, 365].map(v => chip(v, st.days, 'sdays')).join('')}</div>
+      <div class="row"><button class="mini" data-act="spreview" ${st.busy ? 'disabled' : ''}>पहले गिनती देखें</button></div>
+      ${pv ? `<p><b>${st.days} दिन से पुराना:</b> ${pv.orders} ऑर्डर · ${pv.calls} कॉल · ${pv.payments} पेमेंट अलर्ट</p><button class="mini red" data-act="spurge" ${st.busy ? 'disabled' : ''}>CSV डाउनलोड करके हटाइए</button>` : ''}
+      <p class="mute" style="font-size:12px">ध्यान: हटाने के बाद नापा हुआ आकार तुरंत कम न दिखे तो घबराइए नहीं। खाली हुई जगह नया डेटा दोबारा इस्तेमाल कर लेता है, यानी बढ़ना रुक जाता है।</p></div>
+    <div class="card"><h2>अपने-आप हटाना</h2>
+      <p class="mute" style="font-size:13px">चुनी हुई अवधि से पुराने ऑर्डर रोज़ अपने-आप हट जाएँगे (काउंटर खुलने पर साफ़-सफ़ाई चलती है)। इसमें CSV नहीं बनती, इसलिए बिक्री का रिकॉर्ड पहले अपने पास रखिए।</p>
+      <div class="row">${[0, 90, 180, 365].map(v => chip(v, d.retention_days || 0, 'sauto')).join('')}</div>
+      <p class="mute" style="font-size:12.5px">अभी: ${d.retention_days ? 'हर ' + d.retention_days + ' दिन से पुराना हटता है' : 'बंद है (कुछ अपने-आप नहीं हटता)'}</p></div>
+    <div class="card"><h2>इंटरनेट ट्रैफ़िक (महीने की 5 GB सीमा)</h2>
+      <p class="mute" style="font-size:13px">यह मैं ऐप के अंदर नाप नहीं सकता। देखने के लिए: supabase.com → अपना प्रोजेक्ट → Settings → Usage। वहाँ "Egress" की पट्टी 80% से ऊपर जाए तो:</p>
+      <ul class="mute" style="font-size:13px;padding-left:18px"><li>काउंटर की स्क्रीन ज़रूरत से ज़्यादा फ़ोन/टैब पर खुली न रखें।</li><li>मेन्यू की फ़ोटो छोटी (50–100 KB) रखें।</li><li>बार-बार ऊपर जाए तो Pro plan पर जाने का समय है।</li></ul></div>
+    <div class="card"><h2>प्लान कब लें?</h2><ul class="mute" style="font-size:13px;padding-left:18px"><li>जगह 80% से ऊपर रहे और पुराना डेटा हटाना नहीं चाहते।</li><li>Supabase का Usage पेज ट्रैफ़िक 80%+ दिखाए।</li><li>रोज़ के ऑर्डर बहुत बढ़ जाएँ (ऊपर का "भरने में लगेंगे" अनुमान 2–3 महीने से कम दिखे)।</li></ul>
+      <p class="mute" style="font-size:12px">Free plan के नियम Supabase कभी भी बदल सकता है। 500 MB / 5 GB आज की जानकारी है।</p></div>`;
   }
   async function loadOrders() { try { A.orders = (await store.load()).orders; } catch (e) { console.error(e); } }
 
   const P = v => v.split(':').map(x => +x);
   H = {
-    atab: async v => { A.tab = v; if (v === 'ord') await loadOrders(); render(); },
+    atab: async v => { A.tab = v; if (v === 'ord') await loadOrders(); render(); if (v === 'sto') { await loadUsage(); render(); } },
+    sload: async () => { await loadUsage(); render(); },
+    sdays: v => { A.sto.days = +v; A.sto.prev = null; render(); },
+    spreview: async () => { try { A.sto.busy = true; render(); A.sto.prev = await rpcPurge(true); } catch (e) { toast('Ginti nahi nikal paye: ' + (e.message || e), true); } A.sto.busy = false; render(); },
+    spurge: async () => { try {
+      const pv = A.sto.prev || await rpcPurge(true);
+      if (!pv.orders && !pv.calls && !pv.payments && !pv.rzp_orders) { toast('Itna purana kuch nahi hai'); return; }
+      if (!confirm('Pehle ' + pv.orders + ' purane orders ki CSV download hogi, phir ye sab HAMESHA ke liye hat jayenge. Aage badhein?')) return;
+      A.sto.busy = true; render();
+      await exportOldCsv(pv.before);
+      await rpcPurge(false); A.sto.prev = null; toast('Purana data hat gaya ✓'); await loadUsage();
+    } catch (e) { toast('Nahi hua: ' + (e.message || e), true); } A.sto.busy = false; render(); },
+    sauto: async v => { try { const n = +v; const { error } = await sb.from('settings').upsert({ key: 'retention_days', value: n }); if (error) throw error; await loadUsage(); toast(n ? 'Har ' + n + ' din se purana data apne-aap hatega' : 'Apne-aap hatana band'); render(); } catch (e) { toast('Save nahi hua: ' + (e.message || e), true); } },
     alogout: async () => { ADM.on = false; if (DEMO) ls.set('vfe_auth', ''); else await sb.auth.signOut(); adminView(); },
     cadd: () => { A.menu.push({ cat: 'New category', hi: 'नई श्रेणी', items: [] }); mark(); render(); },
     cdel: v => { if (confirm('Poori category delete karein?')) { A.menu.splice(+v, 1); mark(); render(); } },
@@ -2959,6 +3093,7 @@ async function adminView() {
     });
   }
   render();
+  loadUsage().then(() => { if (A.sto.data) render(); });
 }
 
 /* ==========================================================
